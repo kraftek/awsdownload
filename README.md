@@ -23,3 +23,7 @@ supplied either as a list of comma-separated pairs of coordinates as argument, o
 
 A simple example:
     java -jar AWSS2ProductDownload-0.1.jar --out D:\Products --tiles 34TFQ 35TNL --products S2A_OPER_PRD_MSIL1C_PDMC_20160103T183955_R064_V20160103T085753_20160103T085753
+
+#Configuration considerations
+In order to use your own SciHub account, please edit the corresponding properties in the src/main/java/resources/ro/cs/s2/download.properties file.
+In this file you can also edit some SciHub filtering parameters, like returned records limit and the sensing interval.
