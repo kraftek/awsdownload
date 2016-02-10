@@ -2,14 +2,18 @@ package ro.cs.s2;
 
 import org.apache.commons.cli.*;
 
-import java.awt.geom.Path2D;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
+/**
+ * Main execution class.
+ *
+ */
 public class AWSDownloader {
 
     private static Options options;
@@ -99,21 +103,20 @@ public class AWSDownloader {
 
         CommandLineParser parser = new DefaultParser();
         CommandLine commandLine = parser.parse(options, args);
-        List<String> products = new ArrayList<String>();
-        Set<String> tiles = new HashSet<String>();
+        List<String> products = new ArrayList<>();
+        Set<String> tiles = new HashSet<>();
         SingleProductDownloader downloader = new SingleProductDownloader(commandLine.getOptionValue("o"));
         double clouds = 0.0;
-        Path2D.Double areaOfInterest = null;
+        Polygon2D areaOfInterest = new Polygon2D();
         if (commandLine.hasOption("a")) {
             String[] points = commandLine.getOptionValues("a");
             for (String point : points) {
-                areaOfInterest = append(areaOfInterest,
-                                        Double.parseDouble(point.substring(0, point.indexOf(","))),
-                                        Double.parseDouble(point.substring(point.indexOf(",") + 1)));
+                areaOfInterest.append(Double.parseDouble(point.substring(0, point.indexOf(","))),
+                                      Double.parseDouble(point.substring(point.indexOf(",") + 1)));
             }
         } else if (commandLine.hasOption("af")) {
-            areaOfInterest = append(areaOfInterest,
-                                    extract(Files.readAllLines(Paths.get(commandLine.getOptionValue("af")))));
+            areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue("af"))), StandardCharsets.UTF_8));
+            //areaOfInterest.append(extract(Files.readAllLines(Paths.get(commandLine.getOptionValue("af")))));
         }
 
         if (commandLine.hasOption("t")) {
@@ -131,10 +134,10 @@ public class AWSDownloader {
         if (commandLine.hasOption("cp")) {
             clouds = Double.parseDouble(commandLine.getOptionValue("cp"));
         }
-
-        if (areaOfInterest != null) {
+        int numPoints = areaOfInterest.getNumPoints();
+        if (numPoints > 0 && numPoints < 200) {
             ProductSearch search = new ProductSearch(props.getProperty("product.search.url", "https://scihub.copernicus.eu/dhus/search"));
-            search.setPolygons(areaOfInterest);
+            search.setPolygon(areaOfInterest);
             search.setClouds(clouds);
             String user = props.getProperty("product.search.user", "");
             String pwd = props.getProperty("product.search.pwd", "");
@@ -142,7 +145,7 @@ public class AWSDownloader {
                 search = search.auth(user, pwd);
             }
             int limit = Integer.parseInt(props.getProperty("product.search.limit", "10"));
-            String sensingStart = props.getProperty("product.search.sensing", "[NOW-7DAY TO NOW");
+            String sensingStart = props.getProperty("product.search.sensing", "[NOW-7DAY TO NOW]");
             products = search.filter("beginPosition", sensingStart).limit(limit).execute();
         }
         downloader.setFilteredTiles(tiles);
@@ -150,37 +153,6 @@ public class AWSDownloader {
             Path file = downloader.download(product);
             System.out.println("Download " + (Files.exists(file) ? "succeeded" : "failed"));
         }
-    }
-
-    private static Path2D.Double append(Path2D.Double polygon, double x, double y) {
-        if (polygon == null) {
-            polygon = new Path2D.Double();
-            polygon.moveTo(x, y);
-        } else {
-            polygon.lineTo(x, y);
-        }
-        return polygon;
-    }
-
-    private static Path2D.Double append(Path2D.Double polygon, List<String> points) {
-        for (String point : points) {
-            double x = Double.parseDouble(point.substring(0, point.indexOf(" ")));
-            double y = Double.parseDouble(point.substring(point.indexOf(" ") + 1));
-            polygon = append(polygon, x, y);
-        }
-        polygon.closePath();
-        return polygon;
-    }
-
-    private static List<String> extract(List<String> lines) {
-        List<String> pairs = new ArrayList<String>();
-        for (String line : lines) {
-            String[] split = line.split(",");
-            for (String token : split) {
-                pairs.add(token.trim());
-            }
-        }
-        return pairs;
     }
 
 }

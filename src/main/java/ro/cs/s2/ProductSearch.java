@@ -13,12 +13,11 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 
-import java.awt.geom.Path2D;
-import java.awt.geom.Rectangle2D;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Class that issues queries to ESA's SciHub for retrieving product names.
@@ -29,22 +28,19 @@ public class ProductSearch {
 
     private URI url;
     private List<NameValuePair> params;
-    private Set<Path2D> polygons;
+    private Polygon2D polygon;
     private String filter;
     private CredentialsProvider credsProvider;
     private double cloudFilter;
 
     public ProductSearch(String url) throws URISyntaxException {
         this.url = new URI(url);
-        this.polygons = new HashSet<Path2D>();
         this.filter = "platformName:Sentinel-2";
-        this.params = new ArrayList<NameValuePair>();
+        this.params = new ArrayList<>();
     }
 
-    public void setPolygons(Path2D.Double...polygons) {
-        if (polygons != null) {
-            Collections.addAll(this.polygons, polygons);
-        }
+    public void setPolygon(Polygon2D polygon) {
+        this.polygon = polygon;
     }
 
     public void setClouds(double clouds) {
@@ -86,7 +82,7 @@ public class ProductSearch {
     }
 
     public List<String> execute() throws IOException {
-        List<String> results = new ArrayList<String>();
+        List<String> results = new ArrayList<>();
         CloseableHttpClient httpclient;
         if (credsProvider != null) {
             httpclient = HttpClients.custom()
@@ -95,33 +91,13 @@ public class ProductSearch {
         } else {
             httpclient = HttpClients.custom().build();
         }
-        if (this.polygons.size() > 0) {
-            StringBuilder buffer = new StringBuilder();
-            buffer.append("\"Intersects(POLYGON((");
-            for (Path2D polygon : this.polygons) {
-                Rectangle2D bounds2D = polygon.getBounds2D();
-                /*PathIterator pathIterator = polygon.getPathIterator(null);
-                while (!pathIterator.isDone()) {
-                    double[] segment = new double[6];
-                    pathIterator.currentSegment(segment);
-                    buffer.append(String.valueOf(segment[0])).append(" ").append(String.valueOf(segment[1])).append(",");
-                    pathIterator.next();
-                }*/
-                buffer.append(bounds2D.getMinX()).append(" ").append(bounds2D.getMinY()).append(",");
-                buffer.append(bounds2D.getMaxX()).append(" ").append(bounds2D.getMinY()).append(",");
-                buffer.append(bounds2D.getMaxX()).append(" ").append(bounds2D.getMaxY()).append(",");
-                buffer.append(bounds2D.getMinX()).append(" ").append(bounds2D.getMaxY()).append(",");
-                buffer.append(bounds2D.getMinX()).append(" ").append(bounds2D.getMinY());
-            }
-            //buffer.setLength(buffer.length() - 1);
-            buffer.append(")))\"");
-            filter("footprint", buffer.toString());
+        if (this.polygon.getNumPoints() > 0) {
+            filter("footprint", "\"Intersects(" + polygon.toWKT() + ")\"");
         }
         try {
             HttpGet httpget = new HttpGet(getQuery());
             System.out.println("QUERY: " + httpget.getRequestLine());
-            CloseableHttpResponse response = httpclient.execute(httpget);
-            try {
+            try (CloseableHttpResponse response = httpclient.execute(httpget)) {
                 if (response.getStatusLine().getStatusCode() == 200) {
                     String[] strings = EntityUtils.toString(response.getEntity()).split("\n");
                     String currentProduct = null;
@@ -142,8 +118,6 @@ public class ProductSearch {
                         }
                     }
                 }
-            } finally {
-                response.close();
             }
         } finally {
             httpclient.close();
