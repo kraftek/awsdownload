@@ -67,7 +67,7 @@ public class SingleProductDownloader {
 
     public void setFilteredTiles(Set<String> tiles) {
         this.filteredTiles = tiles;
-        if (shouldFilterTiles = (tiles != null)) {
+        if (shouldFilterTiles = (tiles != null && tiles.size() > 0)) {
             StringBuilder text = new StringBuilder();
             text.append("(?:.+)(");
             int idx = 1, n = tiles.size();
@@ -294,9 +294,9 @@ public class SingleProductDownloader {
                 String line = originalLines.get(i);
                 if (line.contains("<Granule_List>")) {
                     if (tileIdPattern.matcher(originalLines.get(i + 1)).matches()) {
-                        lines.addAll(originalLines.subList(i, i + 16));
+                        lines.addAll(originalLines.subList(i, i + 17));
                     }
-                    i += originalLines.get(i + 16).contains("<Granule_List>") ? 16 : 15;
+                    i += 16;
                 } else {
                     lines.add(line);
                 }
