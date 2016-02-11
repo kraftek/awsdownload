@@ -1,10 +1,9 @@
 package ro.cs.s2;
 
-import net.maritimecloud.internal.core.javax.json.Json;
-import net.maritimecloud.internal.core.javax.json.JsonArray;
-import net.maritimecloud.internal.core.javax.json.JsonObject;
-import net.maritimecloud.internal.core.javax.json.JsonReader;
-
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
