@@ -98,25 +98,33 @@ public class ProductSearch {
             HttpGet httpget = new HttpGet(getQuery());
             System.out.println("QUERY: " + httpget.getRequestLine());
             try (CloseableHttpResponse response = httpclient.execute(httpget)) {
-                if (response.getStatusLine().getStatusCode() == 200) {
-                    String[] strings = EntityUtils.toString(response.getEntity()).split("\n");
-                    String currentProduct = null;
-                    double currentClouds;
-                    for (String string : strings) {
-                        if (string.contains("<title>")) {
-                            currentProduct = string.replace("<title>", "").replace("</title>", "");
-                        } else if (string.contains("double")) {
-                            currentClouds = Double.parseDouble(string.replace("<double name=\"cloudcoverpercentage\">", "").replace("</double>", ""));
-                            if (currentProduct != null) {
-                                if (cloudFilter == 0 || currentClouds <= cloudFilter) {
-                                    results.add(currentProduct);
-                                } else {
-                                    System.out.println(String.format("%s skipped [clouds: %s]", currentProduct, currentClouds));
+                switch (response.getStatusLine().getStatusCode()) {
+                    case 200:
+                        String[] strings = EntityUtils.toString(response.getEntity()).split("\n");
+                        String currentProduct = null;
+                        double currentClouds;
+                        for (String string : strings) {
+                            if (string.contains("<title>")) {
+                                currentProduct = string.replace("<title>", "").replace("</title>", "");
+                            } else if (string.contains("double")) {
+                                currentClouds = Double.parseDouble(string.replace("<double name=\"cloudcoverpercentage\">", "").replace("</double>", ""));
+                                if (currentProduct != null) {
+                                    if (cloudFilter == 0 || currentClouds <= cloudFilter) {
+                                        results.add(currentProduct);
+                                    } else {
+                                        System.out.println(String.format("%s skipped [clouds: %s]", currentProduct, currentClouds));
+                                    }
                                 }
+                                currentProduct = null;
                             }
-                            currentProduct = null;
                         }
-                    }
+                        break;
+                    case 401:
+                        System.out.println("The supplied credentials are invalid!");
+                        break;
+                    default:
+                        System.out.println("The request was not successful :" + response.getStatusLine().getReasonPhrase());
+                        break;
                 }
             }
         } finally {

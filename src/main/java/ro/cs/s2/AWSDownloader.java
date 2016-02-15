@@ -6,8 +6,10 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 /**
@@ -82,10 +84,32 @@ public class AWSDownloader {
         options.addOption(Option.builder("cp")
                 .longOpt("cloudpercentage")
                 .argName("cloud.percentage")
-                .desc("The threshold for cloud coverage of the products. Below this threshold, the products will be ignored")
+                .desc("The threshold for cloud coverage of the products. Below this threshold, the products will be ignored. Default is 30.")
                 .hasArg()
                 .optionalArg(true)
                 .build());
+        options.addOption(Option.builder("start")
+                .longOpt("startdate")
+                .argName("start.date")
+                .desc("Look for products from a specific date (formatted as yyyy-MM-dd). Default is current date -7 days")
+                .hasArg()
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder("end")
+                .longOpt("enddate")
+                .argName("end.date")
+                .desc("Look for products up to (and including) a specific date (formatted as yyyy-MM-dd). Default is current date")
+                .hasArg()
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder("l")
+                .longOpt("limit")
+                .argName("limit")
+                .desc("The maximum number of products returned. Default is 10.")
+                .hasArg()
+                .optionalArg(true)
+                .build());
+
         props = new Properties();
         try {
             props.load(AWSDownloader.class.getResourceAsStream("download.properties"));
@@ -106,7 +130,7 @@ public class AWSDownloader {
         List<String> products = new ArrayList<>();
         Set<String> tiles = new HashSet<>();
         SingleProductDownloader downloader = new SingleProductDownloader(commandLine.getOptionValue("o"));
-        double clouds = 0.0;
+
         Polygon2D areaOfInterest = new Polygon2D();
         if (commandLine.hasOption("a")) {
             String[] points = commandLine.getOptionValues("a");
@@ -116,7 +140,6 @@ public class AWSDownloader {
             }
         } else if (commandLine.hasOption("af")) {
             areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue("af"))), StandardCharsets.UTF_8));
-            //areaOfInterest.append(extract(Files.readAllLines(Paths.get(commandLine.getOptionValue("af")))));
         }
 
         if (commandLine.hasOption("t")) {
@@ -131,9 +154,39 @@ public class AWSDownloader {
             products.addAll(Files.readAllLines(Paths.get(commandLine.getOptionValue("pf"))));
         }
 
+        double clouds;
         if (commandLine.hasOption("cp")) {
             clouds = Double.parseDouble(commandLine.getOptionValue("cp"));
+        } else {
+            clouds = 30.0;
         }
+        String sensingStart;
+        if (commandLine.hasOption("start")) {
+            String dateString = commandLine.getOptionValue("start");
+            LocalDate startDate = LocalDate.parse(dateString, DateTimeFormatter.ISO_DATE);
+            long days = ChronoUnit.DAYS.between(startDate, LocalDate.now());
+            sensingStart = "NOW-" + String.valueOf(days) + "DAY";
+        } else {
+            sensingStart = "NOW-7DAY";
+        }
+
+        String sensingEnd;
+        if (commandLine.hasOption("end")) {
+            String dateString = commandLine.getOptionValue("end");
+            LocalDate endDate = LocalDate.parse(dateString, DateTimeFormatter.ISO_DATE);
+            long days = ChronoUnit.DAYS.between(endDate, LocalDate.now());
+            sensingEnd = "NOW-" + String.valueOf(days) + "DAY";
+        } else {
+            sensingEnd = "NOW";
+        }
+
+        int limit;
+        if (commandLine.hasOption("l")) {
+            limit = Integer.parseInt(commandLine.getOptionValue("l"));
+        } else {
+            limit = 10;
+        }
+
         int numPoints = areaOfInterest.getNumPoints();
         if (numPoints > 0) {
             ProductSearch search = new ProductSearch(props.getProperty("product.search.url", "https://scihub.copernicus.eu/dhus/search"));
@@ -144,15 +197,15 @@ public class AWSDownloader {
             if (!user.isEmpty() && !pwd.isEmpty()) {
                 search = search.auth(user, pwd);
             }
-            int limit = Integer.parseInt(props.getProperty("product.search.limit", "10"));
-            String sensingStart = props.getProperty("product.search.sensing", "[NOW-7DAY TO NOW]");
-            products = search.filter("beginPosition", sensingStart).limit(limit).execute();
+            String interval = "[" + sensingStart + " TO " + sensingEnd + "]";
+            products = search.filter("beginPosition", interval).limit(limit).execute();
         }
         downloader.setFilteredTiles(tiles);
-        for (String product : products) {
+        downloader.downloadProducts(products);
+        /*for (String product : products) {
             Path file = downloader.download(product);
             System.out.println("Download " + (Files.exists(file) ? "succeeded" : "failed"));
-        }
+        }*/
     }
 
 }

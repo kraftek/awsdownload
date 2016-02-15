@@ -118,15 +118,13 @@ public class Polygon2D {
 
     public String toWKTBounds() {
         Rectangle2D bounds2D = polygon.getBounds2D();
-        StringBuilder buffer = new StringBuilder();
-        buffer.append("POLYGON((");
-        buffer.append(bounds2D.getMinX()).append(" ").append(bounds2D.getMinY());
-        buffer.append(bounds2D.getMaxX()).append(" ").append(bounds2D.getMinY());
-        buffer.append(bounds2D.getMaxX()).append(" ").append(bounds2D.getMaxY());
-        buffer.append(bounds2D.getMinX()).append(" ").append(bounds2D.getMaxY());
-        buffer.append(bounds2D.getMinX()).append(" ").append(bounds2D.getMinY());
-        buffer.append("))");
-        return buffer.toString();
+        return  "POLYGON((" +
+                bounds2D.getMinX() + " " + bounds2D.getMinY() +
+                bounds2D.getMaxX() + " " + bounds2D.getMinY() +
+                bounds2D.getMaxX() + " " + bounds2D.getMaxY() +
+                bounds2D.getMinX() + " " + bounds2D.getMaxY() +
+                bounds2D.getMinX() + " " + bounds2D.getMinY() +
+                "))";
     }
 
 }
