@@ -92,7 +92,7 @@ public class ProductSearch {
             httpclient = HttpClients.custom().build();
         }
         if (this.polygon.getNumPoints() > 0) {
-            filter("footprint", "\"Intersects(" + polygon.toWKT() + ")\"");
+            filter("footprint", "\"Intersects(" + (polygon.getNumPoints() < 200 ? polygon.toWKT() : polygon.toWKTBounds()) + ")\"");
         }
         try {
             HttpGet httpget = new HttpGet(getQuery());

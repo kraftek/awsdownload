@@ -2,6 +2,7 @@ package ro.cs.s2;
 
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
+import java.awt.geom.Rectangle2D;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -111,6 +112,19 @@ public class Polygon2D {
             pathIterator.next();
         }
         buffer.setLength(buffer.length() - 1);
+        buffer.append("))");
+        return buffer.toString();
+    }
+
+    public String toWKTBounds() {
+        Rectangle2D bounds2D = polygon.getBounds2D();
+        StringBuilder buffer = new StringBuilder();
+        buffer.append("POLYGON((");
+        buffer.append(bounds2D.getMinX()).append(" ").append(bounds2D.getMinY());
+        buffer.append(bounds2D.getMaxX()).append(" ").append(bounds2D.getMinY());
+        buffer.append(bounds2D.getMaxX()).append(" ").append(bounds2D.getMaxY());
+        buffer.append(bounds2D.getMinX()).append(" ").append(bounds2D.getMaxY());
+        buffer.append(bounds2D.getMinX()).append(" ").append(bounds2D.getMinY());
         buffer.append("))");
         return buffer.toString();
     }

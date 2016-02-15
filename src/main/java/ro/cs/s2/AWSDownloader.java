@@ -135,7 +135,7 @@ public class AWSDownloader {
             clouds = Double.parseDouble(commandLine.getOptionValue("cp"));
         }
         int numPoints = areaOfInterest.getNumPoints();
-        if (numPoints > 0 && numPoints < 200) {
+        if (numPoints > 0) {
             ProductSearch search = new ProductSearch(props.getProperty("product.search.url", "https://scihub.copernicus.eu/dhus/search"));
             search.setPolygon(areaOfInterest);
             search.setClouds(clouds);
