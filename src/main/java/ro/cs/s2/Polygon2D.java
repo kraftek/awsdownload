@@ -119,12 +119,11 @@ public class Polygon2D {
     public String toWKTBounds() {
         Rectangle2D bounds2D = polygon.getBounds2D();
         return  "POLYGON((" +
-                bounds2D.getMinX() + " " + bounds2D.getMinY() +
-                bounds2D.getMaxX() + " " + bounds2D.getMinY() +
-                bounds2D.getMaxX() + " " + bounds2D.getMaxY() +
-                bounds2D.getMinX() + " " + bounds2D.getMaxY() +
-                bounds2D.getMinX() + " " + bounds2D.getMinY() +
-                "))";
+                bounds2D.getMinX() + " " + bounds2D.getMinY() + "," +
+                bounds2D.getMaxX() + " " + bounds2D.getMinY() + "," +
+                bounds2D.getMaxX() + " " + bounds2D.getMaxY() + "," +
+                bounds2D.getMinX() + " " + bounds2D.getMaxY() + "," +
+                bounds2D.getMinX() + " " + bounds2D.getMinY() + "))";
     }
 
 }
