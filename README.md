@@ -7,10 +7,11 @@ different from the official SAFE format. Therefore, if you want to use it with t
 #Features
 1. Can perform filter on tiles (i.e. download only tiles of interest from a product to save space) either by supplying
 a tile list on the command line, or by putting tiles in a dedicated file which is supplied as argument.
-2. Can download products / tiles from an area of interest (given a closed linear ring - sequence of <lon lat> pairs,
+2. Can download products / tiles from an area of interest (given a closed linear ring - sequence of <lon lat> pairs),
 supplied either as a list of comma-separated pairs of coordinates as argument, or in a file given as argument.
 3. Can download products / tiles given a list of products.
 4. Can download only products / tiles whose cloud coverage is below a given threshold.
+Filtering on products is mutually exclusive with filtering on an area of interest. The AOI is used to query SciHub for products intersecting it, optionally by supplying the start and end of sensing times. If the AOI is a polygon which has more than 200 points, the extent (bounding box) of this polygon will be used instead.
 
 #How to use it with Git and Maven:
 1. Locally clone the repository
@@ -26,4 +27,3 @@ A simple example:
 
 #Configuration considerations
 In order to use your own SciHub account, please edit the corresponding properties in the src/main/java/resources/ro/cs/s2/download.properties file.
-In this file you can also edit some SciHub filtering parameters, like returned records limit and the sensing interval.
