@@ -11,6 +11,7 @@ a tile list on the command line, or by putting tiles in a dedicated file which i
 supplied either as a list of comma-separated pairs of coordinates as argument, or in a file given as argument.
 3. Can download products / tiles given a list of products.
 4. Can download only products / tiles whose cloud coverage is below a given threshold.
+
 Filtering on products is mutually exclusive with filtering on an area of interest. The AOI is used to query SciHub for products intersecting it, optionally by supplying the start and end of sensing times. If the AOI is a polygon which has more than 200 points, the extent (bounding box) of this polygon will be used instead.
 
 #How to use it with Git and Maven:
