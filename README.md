@@ -1,6 +1,6 @@
 #Purpose
-This is a simple downloader for Sentinel-2 products from Amazon Web Services (AWS).
-The reason of creating this downloader: AWS stores the elements of an S2 product (granules, metadata files) in a way
+This is a simple downloader for Sentinel-2 products from either Amazon Web Services (AWS) or ESA's SciHub.
+The initial reason of creating this downloader: AWS stores the elements of an S2 product (granules, metadata files) in a way
 different from the official SAFE format. Therefore, if you want to use it with tools like Sentinel-2 Toolbox 
 (homepage: https://sentinel.esa.int/web/sentinel/toolboxes/sentinel-2) , you have to download it in a suitable format.
 
@@ -20,11 +20,11 @@ Filtering on products is mutually exclusive with filtering on an area of interes
 2. Build and package the project:
     mvn clean package -DskipTests=true
 3. The folder "lib" and the generated jar should be placed on the same folder. Then:
-    java -jar AWSS2ProductDownload-0.1.jar
+    java -jar AWSS2ProductDownload-0.2.jar
    for a list of supported command line arguments.
 
 A simple example:
-    java -jar AWSS2ProductDownload-0.1.jar --out D:\Products --tiles 34TFQ 35TNL --products S2A_OPER_PRD_MSIL1C_PDMC_20160103T183955_R064_V20160103T085753_20160103T085753
+    java -jar AWSS2ProductDownload-0.2.jar --out D:\Products --tiles 34TFQ 35TNL --products S2A_OPER_PRD_MSIL1C_PDMC_20160103T183955_R064_V20160103T085753_20160103T085753 --store AWS
 
 #Configuration considerations
 In order to use your own SciHub account, please edit the corresponding properties in the src/main/java/resources/ro/cs/s2/download.properties file.
