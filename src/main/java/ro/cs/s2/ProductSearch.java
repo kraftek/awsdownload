@@ -12,6 +12,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+import ro.cs.s2.util.Logger;
 
 import java.io.IOException;
 import java.net.URI;
@@ -81,8 +82,8 @@ public class ProductSearch {
         return this.url.toString() + "?" + URLEncodedUtils.format(params, "UTF-8").replace("+", "%20");
     }
 
-    public List<String> execute() throws IOException {
-        List<String> results = new ArrayList<>();
+    public List<ProductDescriptor> execute() throws IOException {
+        List<ProductDescriptor> results = new ArrayList<>();
         CloseableHttpClient httpclient;
         if (credsProvider != null) {
             httpclient = HttpClients.custom()
@@ -96,41 +97,53 @@ public class ProductSearch {
         }
         try {
             HttpGet httpget = new HttpGet(getQuery());
-            System.out.println("QUERY: " + httpget.getRequestLine());
+            Logger.info(httpget.getRequestLine().toString());
             try (CloseableHttpResponse response = httpclient.execute(httpget)) {
                 switch (response.getStatusLine().getStatusCode()) {
                     case 200:
                         String[] strings = EntityUtils.toString(response.getEntity()).split("\n");
-                        String currentProduct = null;
+                        ProductDescriptor currentProduct = null;
                         double currentClouds;
                         for (String string : strings) {
-                            if (string.contains("<title>")) {
-                                currentProduct = string.replace("<title>", "").replace("</title>", "");
-                            } else if (string.contains("double")) {
-                                currentClouds = Double.parseDouble(string.replace("<double name=\"cloudcoverpercentage\">", "").replace("</double>", ""));
+                            if (string.contains("<entry>")) {
+                                currentProduct = new ProductDescriptor();
+                            } else if (string.contains("</entry>")) {
                                 if (currentProduct != null) {
-                                    if (cloudFilter == 0 || currentClouds <= cloudFilter) {
+                                    double cloudsPercentage = currentProduct.getCloudsPercentage();
+                                    if (cloudFilter == 0 || cloudsPercentage <= cloudFilter) {
                                         results.add(currentProduct);
                                     } else {
-                                        System.out.println(String.format("%s skipped [clouds: %s]", currentProduct, currentClouds));
+                                        Logger.info("%s skipped [clouds: %s]", currentProduct, cloudsPercentage);
                                     }
                                 }
-                                currentProduct = null;
+                            } else if (string.contains("<title>")) {
+                                if (currentProduct != null) {
+                                    currentProduct.setName(string.replace("<title>", "").replace("</title>", ""));
+                                }
+                            } else if (string.contains("cloudcoverpercentage")) {
+                                currentClouds = Double.parseDouble(string.replace("<double name=\"cloudcoverpercentage\">", "").replace("</double>", ""));
+                                if (currentProduct != null) {
+                                    currentProduct.setCloudsPercentage(currentClouds);
+                                }
+                            } else if (string.contains("<id>")) {
+                                if (currentProduct != null) {
+                                    currentProduct.setId(string.replace("<id>", "").replace("</id>", ""));
+                                }
                             }
                         }
                         break;
                     case 401:
-                        System.out.println("The supplied credentials are invalid!");
+                        Logger.info("The supplied credentials are invalid!");
                         break;
                     default:
-                        System.out.println("The request was not successful :" + response.getStatusLine().getReasonPhrase());
+                        Logger.info("The request was not successful. Reason: %s", response.getStatusLine().getReasonPhrase());
                         break;
                 }
             }
         } finally {
             httpclient.close();
         }
-        System.out.println("Found " + String.valueOf(results.size()) + " products");
+        Logger.info("Query returned %s products", results.size());
         return results;
     }
 
