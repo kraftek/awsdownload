@@ -1,6 +1,7 @@
 package ro.cs.s2;
 
 import org.apache.commons.cli.*;
+import ro.cs.s2.util.Constants;
 import ro.cs.s2.util.Logger;
 import ro.cs.s2.util.NetUtils;
 
@@ -28,7 +29,7 @@ public class S2ProductDownloader {
         /*
          * List-valued parameters
          */
-        options.addOption(Option.builder("a")
+        options.addOption(Option.builder(Constants.PARAM_AREA)
                 .longOpt("area")
                 .argName("aoi")
                 .desc("A closed polygon whose vertices are given in <lon lat> pairs, comma-separated")
@@ -36,7 +37,7 @@ public class S2ProductDownloader {
                 .optionalArg(true)
                 .valueSeparator(' ')
                 .build());
-        options.addOption(Option.builder("t")
+        options.addOption(Option.builder(Constants.PARAM_TILE_LIST)
                 .longOpt("tiles")
                 .argName("tiles")
                 .desc("A list of S2 tile IDs, space-separated")
@@ -44,7 +45,7 @@ public class S2ProductDownloader {
                 .optionalArg(true)
                 .valueSeparator(' ')
                 .build());
-        options.addOption(Option.builder("p")
+        options.addOption(Option.builder(Constants.PARAM_PRODUCT_LIST)
                 .longOpt("products")
                 .argName("products")
                 .desc("A list of S2 product names, space-separated")
@@ -52,7 +53,7 @@ public class S2ProductDownloader {
                 .optionalArg(true)
                 .valueSeparator(' ')
                 .build());
-        options.addOption(Option.builder("u")
+        options.addOption(Option.builder(Constants.PARAM_PRODUCT_UUID_LIST)
                 .longOpt("uuid")
                 .argName("uuid")
                 .desc("A list of S2 product unique identifiers, as retrieved from SciHub, space-separated")
@@ -63,88 +64,119 @@ public class S2ProductDownloader {
         /*
          * Single-valued parameters
          */
-        options.addOption(Option.builder("o")
+        options.addOption(Option.builder(Constants.PARAM_OUT_FOLDER)
                 .longOpt("out")
                 .argName("output.folder")
                 .desc("The folder in which the products will be downloaded")
                 .hasArg()
                 .required()
                 .build());
-        options.addOption(Option.builder("af")
+        options.addOption(Option.builder(Constants.PARAM_USER)
+                .longOpt("user")
+                .argName("user")
+                .desc("User account to connect to SCIHUB")
+                .hasArg(true)
+                .required()
+                .build());
+        options.addOption(Option.builder(Constants.PARAM_PASSWORD)
+                .longOpt("password")
+                .argName("password")
+                .desc("Password to connect to SCIHUB")
+                .hasArg(true)
+                .required()
+                .build());
+        options.addOption(Option.builder(Constants.PARAM_AREA_FILE)
                 .longOpt("areafile")
                 .argName("aoi.file")
                 .desc("The file containing a closed polygon whose vertices are given in <lon lat> pairs, comma-separated")
                 .hasArg()
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("tf")
+        options.addOption(Option.builder(Constants.PARAM_TILE_LIST_FILE)
                 .longOpt("tilefile")
                 .argName("tile.file")
                 .desc("A file containing a list of S2 tile IDs, one tile id per line")
                 .hasArg()
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("pf")
+        options.addOption(Option.builder(Constants.PARAM_PRODUCT_LIST_FILE)
                 .longOpt("productfile")
                 .argName("product.file")
                 .desc("A file containing a list of S2 products, one product name per line")
                 .hasArg()
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("cp")
+        options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
                 .longOpt("cloudpercentage")
                 .argName("cloud.percentage")
                 .desc("The threshold for cloud coverage of the products. Below this threshold, the products will be ignored. Default is 30.")
                 .hasArg()
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("start")
+        options.addOption(Option.builder(Constants.PARAM_START_DATE)
                 .longOpt("startdate")
                 .argName("start.date")
                 .desc("Look for products from a specific date (formatted as yyyy-MM-dd). Default is current date -7 days")
                 .hasArg()
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("end")
+        options.addOption(Option.builder(Constants.PARAM_END_DATE)
                 .longOpt("enddate")
                 .argName("end.date")
                 .desc("Look for products up to (and including) a specific date (formatted as yyyy-MM-dd). Default is current date")
                 .hasArg()
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("l")
+        options.addOption(Option.builder(Constants.PARAM_RESULTS_LIMIT)
                 .longOpt("limit")
                 .argName("limit")
                 .desc("The maximum number of products returned. Default is 10.")
                 .hasArg()
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("z")
-                .longOpt("zip")
-                .argName("zip")
-                .desc("Compresses the product into a zip archive")
-                .hasArg(false)
-                .optionalArg(true)
-                .build());
-        options.addOption(Option.builder("d")
-                .longOpt("delete")
-                .argName("delete")
-                .desc("Delete the product files after compression")
-                .hasArg(false)
-                .optionalArg(true)
-                .build());
-        options.addOption(Option.builder("s")
+        options.addOption(Option.builder(Constants.PARAM_DOWNLOAD_STORE)
                 .longOpt("store")
                 .argName("store")
                 .desc("Store of products being downloaded. Supported values are AWS or SCIHUB")
                 .hasArg(true)
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("u")
+        options.addOption(Option.builder(Constants.PARAM_RELATIVE_ORBIT)
+                .longOpt("relative.orbit")
+                .argName("relative.orbit")
+                .desc("Relative orbit number")
+                .hasArg(true)
+                .optionalArg(true)
+                .build());
+        /*
+         * Flag parameters
+         */
+        options.addOption(Option.builder(Constants.PARAM_FLAG_COMPRESS)
+                .longOpt("zip")
+                .argName("zip")
+                .desc("Compresses the product into a zip archive")
+                .hasArg(false)
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder(Constants.PARAM_FLAG_DELETE)
+                .longOpt("delete")
+                .argName("delete")
+                .desc("Delete the product files after compression")
+                .hasArg(false)
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder(Constants.PARAM_FLAG_UNPACKED)
                 .longOpt("unpacked")
                 .argName("unpacked")
                 .desc("Download unpacked products (SciHub only)")
                 .hasArg(true)
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder(Constants.PARAM_FLAG_ANGLES)
+                .longOpt("ma")
+                .argName("missing.angles")
+                .desc("Interpolate missing angles grids (if some are absent)")
+                .hasArg(false)
                 .optionalArg(true)
                 .build());
         props = new Properties();
@@ -165,37 +197,37 @@ public class S2ProductDownloader {
         List<ProductDescriptor> products = new ArrayList<>();
         Set<String> tiles = new HashSet<>();
         Polygon2D areaOfInterest = new Polygon2D();
-        ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue("s", "SCIHUB"));
+        ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE, ProductStore.SCIHUB.toString()));
 
-        String user = props.getProperty("scihub.user", "");
-        String pwd = props.getProperty("scihub.pwd", "");
+        String user = commandLine.getOptionValue(Constants.PARAM_USER);
+        String pwd = commandLine.getOptionValue(Constants.PARAM_PASSWORD);
         if (!user.isEmpty() && !pwd.isEmpty()) {
             String authToken = "Basic " + new String(Base64.getEncoder().encode((user + ":" + pwd).getBytes()));
             NetUtils.setAuthToken(authToken);
         }
 
-        ProductDownloader downloader = new ProductDownloader(source, commandLine.getOptionValue("o"));
+        ProductDownloader downloader = new ProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER));
 
-        if (commandLine.hasOption("a")) {
-            String[] points = commandLine.getOptionValues("a");
+        if (commandLine.hasOption(Constants.PARAM_AREA)) {
+            String[] points = commandLine.getOptionValues(Constants.PARAM_AREA);
             for (String point : points) {
                 areaOfInterest.append(Double.parseDouble(point.substring(0, point.indexOf(","))),
                                       Double.parseDouble(point.substring(point.indexOf(",") + 1)));
             }
-        } else if (commandLine.hasOption("af")) {
-            areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue("af"))), StandardCharsets.UTF_8));
+        } else if (commandLine.hasOption(Constants.PARAM_AREA_FILE)) {
+            areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue(Constants.PARAM_AREA_FILE))), StandardCharsets.UTF_8));
         }
 
-        if (commandLine.hasOption("t")) {
-            Collections.addAll(tiles, commandLine.getOptionValues("t"));
-        } else if (commandLine.hasOption("tf")) {
-            tiles.addAll(Files.readAllLines(Paths.get(commandLine.getOptionValue("tf"))));
+        if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
+            Collections.addAll(tiles, commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
+        } else if (commandLine.hasOption(Constants.PARAM_TILE_LIST_FILE)) {
+            tiles.addAll(Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_TILE_LIST_FILE))));
         }
 
-        if (commandLine.hasOption("p")) {
-            String[] uuids = commandLine.getOptionValues("u");
-            String[] productNames = commandLine.getOptionValues("p");
-            if ((!commandLine.hasOption("s") || "SCIHUB".equals(commandLine.getOptionValue("s"))) &&
+        if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST)) {
+            String[] uuids = commandLine.getOptionValues(Constants.PARAM_PRODUCT_UUID_LIST);
+            String[] productNames = commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST);
+            if ((!commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE) || ProductStore.SCIHUB.toString().equals(commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE))) &&
                     (uuids == null || uuids.length != productNames.length)) {
                 System.err.println("For the list of product names a corresponding list of UUIDs has to be given!");
                 System.exit(-1);
@@ -207,60 +239,61 @@ public class S2ProductDownloader {
                 }
                 products.add(productDescriptor);
             }
-        } else if (commandLine.hasOption("pf")) {
-            for (String line : Files.readAllLines(Paths.get(commandLine.getOptionValue("pf")))) {
+        } else if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST_FILE)) {
+            for (String line : Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_PRODUCT_LIST_FILE)))) {
                 products.add(new ProductDescriptor(line));
             }
         }
 
         double clouds;
-        if (commandLine.hasOption("cp")) {
-            clouds = Double.parseDouble(commandLine.getOptionValue("cp"));
+        if (commandLine.hasOption(Constants.PARAM_CLOUD_PERCENTAGE)) {
+            clouds = Double.parseDouble(commandLine.getOptionValue(Constants.PARAM_CLOUD_PERCENTAGE));
         } else {
-            clouds = 30.0;
+            clouds = Constants.DEFAULT_CLOUD_PERCENTAGE;
         }
         String sensingStart;
-        if (commandLine.hasOption("start")) {
-            String dateString = commandLine.getOptionValue("start");
+        if (commandLine.hasOption(Constants.PARAM_START_DATE)) {
+            String dateString = commandLine.getOptionValue(Constants.PARAM_START_DATE);
             LocalDate startDate = LocalDate.parse(dateString, DateTimeFormatter.ISO_DATE);
             long days = ChronoUnit.DAYS.between(startDate, LocalDate.now());
-            sensingStart = "NOW-" + String.valueOf(days) + "DAY";
+            sensingStart = String.format(Constants.PATTERN_START_DATE, days);
         } else {
-            sensingStart = "NOW-7DAY";
+            sensingStart = Constants.DEFAULT_START_DATE;
         }
 
         String sensingEnd;
-        if (commandLine.hasOption("end")) {
-            String dateString = commandLine.getOptionValue("end");
+        if (commandLine.hasOption(Constants.PARAM_END_DATE)) {
+            String dateString = commandLine.getOptionValue(Constants.PARAM_END_DATE);
             LocalDate endDate = LocalDate.parse(dateString, DateTimeFormatter.ISO_DATE);
             long days = ChronoUnit.DAYS.between(endDate, LocalDate.now());
-            sensingEnd = "NOW-" + String.valueOf(days) + "DAY";
+            sensingEnd = String.format(Constants.PATTERN_START_DATE, days);
         } else {
-            sensingEnd = "NOW";
+            sensingEnd = Constants.DEFAULT_END_DATE;
         }
 
         int limit;
-        if (commandLine.hasOption("l")) {
-            limit = Integer.parseInt(commandLine.getOptionValue("l"));
+        if (commandLine.hasOption(Constants.PARAM_RESULTS_LIMIT)) {
+            limit = Integer.parseInt(commandLine.getOptionValue(Constants.PARAM_RESULTS_LIMIT));
         } else {
-            limit = 10;
+            limit = Constants.DEFAULT_RESULTS_LIMIT;
         }
 
-        if (commandLine.hasOption("s")) {
-            String value = commandLine.getOptionValue("s");
+        if (commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE)) {
+            String value = commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE);
             downloader.setDownloadStore(Enum.valueOf(ProductStore.class, value));
             Logger.info("Products will be downloaded from %s", value);
         }
 
-        downloader.shouldCompress(commandLine.hasOption("z"));
-        downloader.shouldDeleteAfterCompression(commandLine.hasOption("d"));
+        downloader.shouldCompress(commandLine.hasOption(Constants.PARAM_FLAG_COMPRESS));
+        downloader.shouldDeleteAfterCompression(commandLine.hasOption(Constants.PARAM_FLAG_DELETE));
+        downloader.shouldFillMissingAngles(commandLine.hasOption(Constants.PARAM_FLAG_ANGLES));
 
         int numPoints = areaOfInterest.getNumPoints();
         if (numPoints > 0) {
-            String searchUrl = props.getProperty("scihub.search.url", "https://scihub.copernicus.eu/apihub/search");
+            String searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
             if (!NetUtils.isAvailable(searchUrl)) {
                 Logger.error(searchUrl + " is not available!");
-                searchUrl = props.getProperty("scihub.search.backup.url", "https://scihub.copernicus.eu/dhus/search");
+                searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
             }
             ProductSearch search = new ProductSearch(searchUrl);
             search.setPolygon(areaOfInterest);
@@ -269,9 +302,13 @@ public class S2ProductDownloader {
                 search = search.auth(user, pwd);
             }
             String interval = "[" + sensingStart + " TO " + sensingEnd + "]";
-            products = search.filter("beginPosition", interval).limit(limit).execute();
+            search.filter(Constants.SEARCH_PARAM_INTERVAL, interval).limit(limit);
+            if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
+                search.filter(Constants.SEARCH_PARAM_RELATIVE_ORBIT_NUMBER, commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT));
+            }
+            products = search.execute();
         }
-        downloader.setFilteredTiles(tiles, commandLine.hasOption("u"));
+        downloader.setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
         boolean succeeded = downloader.downloadProducts(products);
         System.exit(succeeded ? 0 : -1);
     }

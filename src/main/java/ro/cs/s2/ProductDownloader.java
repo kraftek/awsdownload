@@ -3,6 +3,10 @@ package ro.cs.s2;
 import ro.cs.s2.util.Logger;
 import ro.cs.s2.util.NetUtils;
 import ro.cs.s2.util.Zipper;
+import ro.cs.s2.workaround.AngleGrid;
+import ro.cs.s2.workaround.MetaGrid;
+import ro.cs.s2.workaround.ViewingIncidenceAngleGrid;
+import ro.cs.s2.workaround.XmlAnglesReader;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -69,6 +73,7 @@ public class ProductDownloader {
 
     private boolean shouldCompress;
     private boolean shouldDeleteAfterCompression;
+    private boolean shouldFillMissingAngles;
 
     private ProductStore store;
 
@@ -132,6 +137,10 @@ public class ProductDownloader {
         this.shouldDeleteAfterCompression = shouldDeleteAfterCompression;
     }
 
+    public void shouldFillMissingAngles(boolean value) {
+        this.shouldFillMissingAngles = value;
+    }
+
     public boolean downloadProducts(List<ProductDescriptor> products){
         int failedProducts = 0;
         if (products != null) {
@@ -142,13 +151,16 @@ public class ProductDownloader {
                 Path file = null;
                 try {
                     file = download(product);
+                    Logger.warn("Product download aborted");
                 } catch (IOException ignored) {
+                    Logger.warn("IO Exception: " + ignored.getMessage());
+                    Logger.warn("Product download failed");
                 }
                 long millis = System.currentTimeMillis() - startTime;
                 if (file != null && Files.exists(file)) {
                     Logger.info("Product download completed in %s", formatTime(millis));
                 } else {
-                    Logger.warn("Product download failed");
+                    //Logger.warn("Product download failed");
                     failedProducts++;
                 }
             }
@@ -246,8 +258,29 @@ public class ProductDownloader {
                         if (tileMetaFile != null) {
                             if (Files.exists(tileMetaFile)) {
                                 List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
-                                if (filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size() == 0) {
-                                    Logger.warn("Metadata for tile %s doesn't contain the angles grids!", tileName);
+                                if (filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size() != 13 * 12) {
+                                    Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
+                                    if (this.shouldFillMissingAngles) {
+                                        Map<String, MetaGrid> angleGridMap = XmlAnglesReader.parse(metadataFile);
+                                        List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
+                                        StringBuilder lines = new StringBuilder();
+                                        String message = "Angle grids have been computed for the bands ";
+                                        Set<Integer> missingBandIds = new TreeSet<>();
+                                        for (ViewingIncidenceAngleGrid missingGrid : missingAngles) {
+                                            lines.append(missingGrid.toString());
+                                            missingBandIds.add(missingGrid.getBandId());
+                                        }
+
+                                        String[] tokens = lines.toString().split("\n");
+                                        if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(missingAngles, true), computeMeanAngles(missingAngles, false)))) {
+                                            Logger.warn("Metadata for tile %s has not been updated!", tileName);
+                                        } else {
+                                            for(Integer bandId : missingBandIds) {
+                                                message = message + String.valueOf(bandId) + "; ";
+                                            }
+                                            Logger.info(message);
+                                        }
+                                    }
                                 }
                                 for (String bandFileName : bandFiles) {
                                     downloadFile(pathBuilder.root(tileUrl).node("IMG_DATA").node(refName + NAME_SEPARATOR + bandFileName).value(), imgData.resolve(refName + NAME_SEPARATOR + bandFileName));
@@ -344,8 +377,34 @@ public class ProductDownloader {
                             String metadataName = refName.replace("MSI", "MTD");
                             Path tileMetaFile = downloadFile(tileUrl + "/metadata.xml", tileFolder.resolve(metadataName + ".xml"));
                             List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
-                            if (filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size() == 0) {
-                                Logger.warn("Metadata for tile %s doesn't contain the angles grids!", tileName);
+                            if (filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size() != 13 * 12) {
+                                Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
+                                if(this.shouldFillMissingAngles) {
+                                    try {
+                                        Map<String, MetaGrid> angleGridMap = XmlAnglesReader.parse(tileMetaFile);
+                                        List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
+                                        StringBuilder lines = new StringBuilder();
+                                        String message = "Angle grids have been computed for the bands ";
+                                        Set<Integer> missingBandIds = new TreeSet<>();
+
+                                        for (ViewingIncidenceAngleGrid missingGrid : missingAngles) {
+                                            lines.append(missingGrid.toString());
+                                            missingBandIds.add(missingGrid.getBandId());
+                                        }
+
+                                        String[] tokens = lines.toString().split("\n");
+                                        if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(missingAngles, true), computeMeanAngles(missingAngles, false)))) {
+                                            Logger.warn("Metadata for tile %s has not been updated!", tileName);
+                                        } else {
+                                            for(Integer bandId : missingBandIds) {
+                                                message = message + String.valueOf(bandId) + "; ";
+                                            }
+                                            Logger.info(message);
+                                        }
+                                    } catch (Exception e) {
+                                        Logger.error(e.getMessage());
+                                    }
+                                }
                             }
                             for (String bandFileName : bandFiles) {
                                 try {
@@ -550,6 +609,84 @@ public class ProductDownloader {
         return value;
     }
 
+    private List<ViewingIncidenceAngleGrid> computeMissingAngles(Map<String, MetaGrid> angleGridMap) {
+        MetaGrid zeniths = angleGridMap.get("Zenith");
+        MetaGrid azimuths = angleGridMap.get("Azimuth");
+        List<ViewingIncidenceAngleGrid> computedGrids = new ArrayList<>();
+        Set<Integer> missingBandIds = zeniths.fillGaps();
+        azimuths.fillGaps();
+        for(int bandId = 0; bandId < 13; ++bandId) {
+            if (missingBandIds.contains(bandId)) {
+                List<AngleGrid> zenithsBandGrids = zeniths.getBandGrids(bandId);
+                List<AngleGrid> azimuthsBandGrids = azimuths.getBandGrids(bandId);
+                for (int detectorId = 0; detectorId < zenithsBandGrids.size(); detectorId++) {
+                    ViewingIncidenceAngleGrid grid = new ViewingIncidenceAngleGrid(bandId, detectorId);
+                    grid.setZenith(zenithsBandGrids.get(detectorId));
+                    grid.setAzimuth(azimuthsBandGrids.get(detectorId));
+                    computedGrids.add(grid);
+                }
+            }
+        }
+
+        return computedGrids;
+    }
+
+    private Map<Integer, Double> computeMeanAngles(List<ViewingIncidenceAngleGrid> missingGrids, boolean isZenith) {
+        Map<Integer, Double> means = new HashMap<>();
+        Map<Integer, Integer> nonNaNCounts = new HashMap<>();
+        for (ViewingIncidenceAngleGrid grid : missingGrids) {
+            int bandId = grid.getBandId();
+            double meanValue = (isZenith ? grid.getZenith() : grid.getAzimuth()).meanValue();
+            if(!Double.isNaN(meanValue)) {
+                if(!means.containsKey(bandId)) {
+                    means.put(bandId, meanValue);
+                } else {
+                    means.put(bandId, means.get(bandId) + meanValue);
+                }
+
+                if(!nonNaNCounts.containsKey(bandId)) {
+                    nonNaNCounts.put(bandId, 1);
+                } else {
+                    nonNaNCounts.put(bandId, nonNaNCounts.get(bandId) + 1);
+                }
+            }
+        }
+        for (Integer bandId : means.keySet()) {
+            means.put(bandId, means.get(bandId) / (double) (nonNaNCounts.containsKey(bandId) ? nonNaNCounts.get(bandId) : 1));
+        }
+
+        return means;
+    }
+
+    private List<String> meansToXml(Map<Integer, Double> zenithMeans, Map<Integer, Double> azimuthMeans) {
+        StringBuilder buffer = new StringBuilder();
+        Iterator var4;
+        int bandId;
+        if(zenithMeans.size() >= azimuthMeans.size()) {
+            var4 = zenithMeans.keySet().iterator();
+
+            while(var4.hasNext()) {
+                bandId = (Integer) var4.next();
+                buffer.append("        ").append("<Mean_Viewing_Incidence_Angle bandId=\"").append(bandId).append("\">\n");
+                buffer.append("          ").append("<ZENITH_ANGLE unit=\"deg\">").append(zenithMeans.get(bandId)).append("</ZENITH_ANGLE>\n");
+                buffer.append("          ").append("<AZIMUTH_ANGLE unit=\"deg\">").append(azimuthMeans.containsKey(bandId)?(Serializable)azimuthMeans.get(bandId):"NaN").append("</AZIMUTH_ANGLE>\n");
+                buffer.append("        ").append("</Mean_Viewing_Incidence_Angle>\n");
+            }
+        } else {
+            var4 = azimuthMeans.keySet().iterator();
+
+            while(var4.hasNext()) {
+                bandId = (Integer) var4.next();
+                buffer.append("        ").append("<Mean_Viewing_Incidence_Angle bandId=\"").append(bandId).append("\">\n");
+                buffer.append("          ").append("<ZENITH_ANGLE unit=\"deg\">").append(zenithMeans.containsKey(bandId)?(Serializable)zenithMeans.get(bandId):"NaN").append("</ZENITH_ANGLE>\n");
+                buffer.append("          ").append("<AZIMUTH_ANGLE unit=\"deg\">").append(azimuthMeans.get(bandId)).append("</AZIMUTH_ANGLE>\n");
+                buffer.append("        ").append("</Mean_Viewing_Incidence_Angle>\n");
+            }
+        }
+
+        return Arrays.asList(buffer.toString().split("\n"));
+    }
+
     private boolean updateMedatata(Path metaFile, List<String> originalLines) throws IOException {
         boolean canProceed = true;
         if (shouldFilterTiles) {
@@ -572,6 +709,33 @@ public class ProductDownloader {
             }
         }
         return canProceed;
+    }
+
+    private boolean insertAngles(Path metaFile, List<String> originalLines, List<String> gridLines, List<String> meanLines) throws IOException {
+        boolean gridUpdated = false;
+        boolean meansUpdated = false;
+        int lineCount = originalLines.size();
+
+        for(int idx = 0; idx < lineCount; ++idx) {
+            String line = originalLines.get(idx);
+            if(line.contains("<Viewing_Incidence_Angles_Grids") && !gridUpdated) {
+                gridUpdated = originalLines.addAll(idx, gridLines);
+                idx += gridLines.size();
+                lineCount += gridLines.size();
+            }
+
+            if(line.contains("<Mean_Viewing_Incidence_Angle ") && !meansUpdated) {
+                meansUpdated = originalLines.addAll(idx, meanLines);
+                idx = lineCount;
+            }
+        }
+
+        if(gridUpdated && meansUpdated) {
+            Files.copy(metaFile, Paths.get(metaFile.toAbsolutePath().toString() + ".bkp"));
+            Files.write(metaFile, originalLines, StandardCharsets.UTF_8);
+        }
+
+        return gridUpdated && meansUpdated;
     }
 
     private class ODataPath {
