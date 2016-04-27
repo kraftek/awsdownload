@@ -1,18 +1,13 @@
 package ro.cs.s2;
 
 import org.apache.http.NameValuePair;
-import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URLEncodedUtils;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import ro.cs.s2.util.Logger;
+import ro.cs.s2.util.NetUtils;
 
 import java.io.IOException;
 import java.net.URI;
@@ -31,7 +26,8 @@ public class ProductSearch {
     private List<NameValuePair> params;
     private Polygon2D polygon;
     private String filter;
-    private CredentialsProvider credsProvider;
+    //private CredentialsProvider credsProvider;
+    private UsernamePasswordCredentials credentials;
     private double cloudFilter;
 
     public ProductSearch(String url) throws URISyntaxException {
@@ -70,10 +66,7 @@ public class ProductSearch {
     }
 
     public ProductSearch auth(String user, String pwd) {
-        this.credsProvider = new BasicCredentialsProvider();
-        credsProvider.setCredentials(
-                new AuthScope(url.getHost(), "https".equals(url.getScheme()) ? 443 : 80),
-                new UsernamePasswordCredentials(user, pwd));
+        this.credentials = new UsernamePasswordCredentials(user, pwd);
         return this;
     }
 
@@ -84,64 +77,52 @@ public class ProductSearch {
 
     public List<ProductDescriptor> execute() throws IOException {
         List<ProductDescriptor> results = new ArrayList<>();
-        CloseableHttpClient httpclient;
-        if (credsProvider != null) {
-            httpclient = HttpClients.custom()
-                    .setDefaultCredentialsProvider(credsProvider)
-                    .build();
-        } else {
-            httpclient = HttpClients.custom().build();
-        }
         if (this.polygon.getNumPoints() > 0) {
             filter("footprint", "\"Intersects(" + (polygon.getNumPoints() < 200 ? polygon.toWKT() : polygon.toWKTBounds()) + ")\"");
         }
-        try {
-            HttpGet httpget = new HttpGet(getQuery());
-            Logger.info(httpget.getRequestLine().toString());
-            try (CloseableHttpResponse response = httpclient.execute(httpget)) {
-                switch (response.getStatusLine().getStatusCode()) {
-                    case 200:
-                        String[] strings = EntityUtils.toString(response.getEntity()).split("\n");
-                        ProductDescriptor currentProduct = null;
-                        double currentClouds;
-                        for (String string : strings) {
-                            if (string.contains("<entry>")) {
-                                currentProduct = new ProductDescriptor();
-                            } else if (string.contains("</entry>")) {
-                                if (currentProduct != null) {
-                                    double cloudsPercentage = currentProduct.getCloudsPercentage();
-                                    if (cloudFilter == 0 || cloudsPercentage <= cloudFilter) {
-                                        results.add(currentProduct);
-                                    } else {
-                                        Logger.info("%s skipped [clouds: %s]", currentProduct, cloudsPercentage);
-                                    }
-                                }
-                            } else if (string.contains("<title>")) {
-                                if (currentProduct != null) {
-                                    currentProduct.setName(string.replace("<title>", "").replace("</title>", ""));
-                                }
-                            } else if (string.contains("cloudcoverpercentage")) {
-                                currentClouds = Double.parseDouble(string.replace("<double name=\"cloudcoverpercentage\">", "").replace("</double>", ""));
-                                if (currentProduct != null) {
-                                    currentProduct.setCloudsPercentage(currentClouds);
-                                }
-                            } else if (string.contains("<id>")) {
-                                if (currentProduct != null) {
-                                    currentProduct.setId(string.replace("<id>", "").replace("</id>", ""));
+        String queryUrl = getQuery();
+        Logger.info(queryUrl);
+        try (CloseableHttpResponse response = NetUtils.openConnection(queryUrl, credentials)) {
+            switch (response.getStatusLine().getStatusCode()) {
+                case 200:
+                    String[] strings = EntityUtils.toString(response.getEntity()).split("\n");
+                    ProductDescriptor currentProduct = null;
+                    double currentClouds;
+                    for (String string : strings) {
+                        if (string.contains("<entry>")) {
+                            currentProduct = new ProductDescriptor();
+                        } else if (string.contains("</entry>")) {
+                            if (currentProduct != null) {
+                                double cloudsPercentage = currentProduct.getCloudsPercentage();
+                                if (cloudFilter == 0 || cloudsPercentage <= cloudFilter) {
+                                    results.add(currentProduct);
+                                } else {
+                                    Logger.info("%s skipped [clouds: %s]", currentProduct, cloudsPercentage);
                                 }
                             }
+                        } else if (string.contains("<title>")) {
+                            if (currentProduct != null) {
+                                currentProduct.setName(string.replace("<title>", "").replace("</title>", ""));
+                            }
+                        } else if (string.contains("cloudcoverpercentage")) {
+                            currentClouds = Double.parseDouble(string.replace("<double name=\"cloudcoverpercentage\">", "").replace("</double>", ""));
+                            if (currentProduct != null) {
+                                currentProduct.setCloudsPercentage(currentClouds);
+                            }
+                        } else if (string.contains("<id>")) {
+                            if (currentProduct != null) {
+                                currentProduct.setId(string.replace("<id>", "").replace("</id>", ""));
+                            }
                         }
-                        break;
-                    case 401:
-                        Logger.info("The supplied credentials are invalid!");
-                        break;
-                    default:
-                        Logger.info("The request was not successful. Reason: %s", response.getStatusLine().getReasonPhrase());
-                        break;
-                }
+                    }
+                    break;
+                case 401:
+                    Logger.info("The supplied credentials are invalid!");
+                    break;
+                default:
+                    Logger.info("The request was not successful. Reason: %s", response.getStatusLine().getReasonPhrase());
+                    break;
             }
-        } finally {
-            httpclient.close();
         }
         Logger.info("Query returned %s products", results.size());
         return results;

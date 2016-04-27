@@ -179,6 +179,44 @@ public class S2ProductDownloader {
                 .hasArg(false)
                 .optionalArg(true)
                 .build());
+        /*
+         * Proxy parameters
+         */
+        options.addOption(Option.builder("ptype")
+                .longOpt("proxy.type")
+                .argName("proxy.type")
+                .desc("Proxy type (http or socks)")
+                .hasArg(true)
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder("phost")
+                .longOpt("proxy.host")
+                .argName("proxy.host")
+                .desc("Proxy host")
+                .hasArg(true)
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder("pport")
+                .longOpt("proxy.port")
+                .argName("proxy.port")
+                .desc("Proxy port")
+                .hasArg(true)
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder("puser")
+                .longOpt("proxy.user")
+                .argName("proxy.user")
+                .desc("Proxy user")
+                .hasArg(true)
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder("ppwd")
+                .longOpt("proxy.password")
+                .argName("proxy.password")
+                .desc("Proxy password")
+                .hasArg(true)
+                .optionalArg(true)
+                .build());
         props = new Properties();
         try {
             props.load(S2ProductDownloader.class.getResourceAsStream("download.properties"));
@@ -198,6 +236,23 @@ public class S2ProductDownloader {
         Set<String> tiles = new HashSet<>();
         Polygon2D areaOfInterest = new Polygon2D();
         ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE, ProductStore.SCIHUB.toString()));
+
+        String proxyType = commandLine.hasOption("ptype") ?
+                commandLine.getOptionValue("ptype") :
+                nullIfEmpty(props.getProperty("proxy.type", null));
+        String proxyHost = commandLine.hasOption("phost") ?
+                commandLine.getOptionValue("phost") :
+                nullIfEmpty(props.getProperty("proxy.host", null));
+        String proxyPort = commandLine.hasOption("pport") ?
+                commandLine.getOptionValue("pport") :
+                nullIfEmpty(props.getProperty("proxy.port", null));
+        String proxyUser = commandLine.hasOption("puser") ?
+                commandLine.getOptionValue("puser") :
+                nullIfEmpty(props.getProperty("proxy.user", null));
+        String proxyPwd = commandLine.hasOption("ppwd") ?
+                commandLine.getOptionValue("ppwd") :
+                nullIfEmpty(props.getProperty("proxy.pwd", null));
+        NetUtils.setProxy(proxyType, proxyHost, proxyPort == null ? 0 : Integer.parseInt(proxyPort), proxyUser, proxyPwd);
 
         String user = commandLine.getOptionValue(Constants.PARAM_USER);
         String pwd = commandLine.getOptionValue(Constants.PARAM_PASSWORD);
@@ -313,4 +368,7 @@ public class S2ProductDownloader {
         System.exit(succeeded ? 0 : -1);
     }
 
+    private static String nullIfEmpty(String string) {
+        return string != null ? (string.isEmpty() ? null : string) : null;
+    }
 }

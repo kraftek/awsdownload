@@ -30,7 +30,6 @@ import java.util.regex.Pattern;
  * @author Cosmin Cara
  */
 public class ProductDownloader {
-    public static final int TIMEOUT = 30000;
     private static final String prefix = "S2A_OPER_PRD_MSIL1C_PDMC_";
     private static final String tilePrefix = "S2A_OPER_MSI_L1C_TL_MTI__";
     private static final String auxPrefix = "S2A_OPER_AUX_ECMWFT_MTI__";
@@ -520,13 +519,14 @@ public class ProductDownloader {
         HttpURLConnection connection = null;
         Path tmpFile = null;
         try {
-            URL url = new URL(remoteUrl);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setConnectTimeout(TIMEOUT);
-            connection.setReadTimeout(TIMEOUT);
-            if (store == ProductStore.SCIHUB) {
-                connection.setRequestProperty("Authorization", NetUtils.getAuthToken());
-            }
+//            URL url = new URL(remoteUrl);
+//            connection = (HttpURLConnection) url.openConnection();
+//            connection.setConnectTimeout(TIMEOUT);
+//            connection.setReadTimeout(TIMEOUT);
+//            if (store == ProductStore.SCIHUB) {
+//                connection.setRequestProperty("Authorization", NetUtils.getAuthToken());
+//            }
+            connection = NetUtils.openConnection(remoteUrl, store == ProductStore.SCIHUB ? NetUtils.getAuthToken() : null);
             if (!Files.exists(file)) {
                 long remoteFileLength = connection.getContentLengthLong();
                 int kBytes = (int) (remoteFileLength / 1024);
