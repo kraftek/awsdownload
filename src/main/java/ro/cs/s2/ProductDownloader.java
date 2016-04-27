@@ -151,7 +151,9 @@ public class ProductDownloader {
                 Path file = null;
                 try {
                     file = download(product);
-                    Logger.warn("Product download aborted");
+                    if (file == null) {
+                        Logger.warn("Product download aborted");
+                    }
                 } catch (IOException ignored) {
                     Logger.warn("IO Exception: " + ignored.getMessage());
                     Logger.warn("Product download failed");
@@ -258,26 +260,31 @@ public class ProductDownloader {
                         if (tileMetaFile != null) {
                             if (Files.exists(tileMetaFile)) {
                                 List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
-                                if (filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size() != 13 * 12) {
+                                int gridCount = filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
+                                if (gridCount != 13 * 12) {
                                     Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
                                     if (this.shouldFillMissingAngles) {
                                         Map<String, MetaGrid> angleGridMap = XmlAnglesReader.parse(metadataFile);
                                         List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
                                         StringBuilder lines = new StringBuilder();
-                                        String message = "Angle grids have been computed for the bands ";
+                                        String message = "Angle grids have been computed for ";
                                         Set<Integer> missingBandIds = new TreeSet<>();
                                         for (ViewingIncidenceAngleGrid missingGrid : missingAngles) {
                                             lines.append(missingGrid.toString());
                                             missingBandIds.add(missingGrid.getBandId());
                                         }
-
+                                        if (missingBandIds.isEmpty()) {
+                                            message += String.valueOf(13*12-gridCount) + " missing detectors";
+                                        } else {
+                                            message += "the bands ";
+                                            for (Integer bandId : missingBandIds) {
+                                                message = message + String.valueOf(bandId) + "; ";
+                                            }
+                                        }
                                         String[] tokens = lines.toString().split("\n");
                                         if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(missingAngles, true), computeMeanAngles(missingAngles, false)))) {
                                             Logger.warn("Metadata for tile %s has not been updated!", tileName);
                                         } else {
-                                            for(Integer bandId : missingBandIds) {
-                                                message = message + String.valueOf(bandId) + "; ";
-                                            }
                                             Logger.info(message);
                                         }
                                     }
@@ -377,28 +384,33 @@ public class ProductDownloader {
                             String metadataName = refName.replace("MSI", "MTD");
                             Path tileMetaFile = downloadFile(tileUrl + "/metadata.xml", tileFolder.resolve(metadataName + ".xml"));
                             List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
-                            if (filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size() != 13 * 12) {
+                            int gridCount = filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
+                            if (gridCount != 13 * 12) {
                                 Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
                                 if(this.shouldFillMissingAngles) {
                                     try {
                                         Map<String, MetaGrid> angleGridMap = XmlAnglesReader.parse(tileMetaFile);
                                         List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
                                         StringBuilder lines = new StringBuilder();
-                                        String message = "Angle grids have been computed for the bands ";
+                                        String message = "Angle grids have been computed for ";
                                         Set<Integer> missingBandIds = new TreeSet<>();
 
                                         for (ViewingIncidenceAngleGrid missingGrid : missingAngles) {
                                             lines.append(missingGrid.toString());
                                             missingBandIds.add(missingGrid.getBandId());
                                         }
-
+                                        if (missingBandIds.isEmpty()) {
+                                            message += String.valueOf(13*12 - gridCount) + " missing detectors";
+                                        } else {
+                                            message += "the bands ";
+                                            for (Integer bandId : missingBandIds) {
+                                                message = message + String.valueOf(bandId) + "; ";
+                                            }
+                                        }
                                         String[] tokens = lines.toString().split("\n");
                                         if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(missingAngles, true), computeMeanAngles(missingAngles, false)))) {
                                             Logger.warn("Metadata for tile %s has not been updated!", tileName);
                                         } else {
-                                            for(Integer bandId : missingBandIds) {
-                                                message = message + String.valueOf(bandId) + "; ";
-                                            }
                                             Logger.info(message);
                                         }
                                     } catch (Exception e) {

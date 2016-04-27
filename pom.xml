@@ -5,11 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>groupId</groupId>
-    <artifactId>AWSS2ProductDownload</artifactId>
-    <version>0.1</version>
+    <artifactId>S2ProductDownloader</artifactId>
+    <version>1.0</version>
     <packaging>jar</packaging>
 
-    <name>aws-s2-download</name>
+    <name>s2-downloader</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -86,7 +86,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>ro.cs.s2.AWSDownloader</mainClass>
+                            <mainClass>ro.cs.s2.S2ProductDownloader</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
