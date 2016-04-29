@@ -4,6 +4,7 @@ import org.apache.commons.cli.*;
 import ro.cs.s2.util.Constants;
 import ro.cs.s2.util.Logger;
 import ro.cs.s2.util.NetUtils;
+import ro.cs.s2.workaround.FillAnglesMethod;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -31,7 +32,7 @@ public class S2ProductDownloader {
          */
         options.addOption(Option.builder(Constants.PARAM_AREA)
                 .longOpt("area")
-                .argName("aoi")
+                .argName("lon1 lat1, lon2 lat2, ...")
                 .desc("A closed polygon whose vertices are given in <lon lat> pairs, comma-separated")
                 .hasArgs()
                 .optionalArg(true)
@@ -39,7 +40,7 @@ public class S2ProductDownloader {
                 .build());
         options.addOption(Option.builder(Constants.PARAM_TILE_LIST)
                 .longOpt("tiles")
-                .argName("tiles")
+                .argName("tileId1 tileId2 ...")
                 .desc("A list of S2 tile IDs, space-separated")
                 .hasArgs()
                 .optionalArg(true)
@@ -47,7 +48,7 @@ public class S2ProductDownloader {
                 .build());
         options.addOption(Option.builder(Constants.PARAM_PRODUCT_LIST)
                 .longOpt("products")
-                .argName("products")
+                .argName("product1 product2 ...")
                 .desc("A list of S2 product names, space-separated")
                 .hasArgs()
                 .optionalArg(true)
@@ -55,7 +56,7 @@ public class S2ProductDownloader {
                 .build());
         options.addOption(Option.builder(Constants.PARAM_PRODUCT_UUID_LIST)
                 .longOpt("uuid")
-                .argName("uuid")
+                .argName("uuid1 uui2 ...")
                 .desc("A list of S2 product unique identifiers, as retrieved from SciHub, space-separated")
                 .hasArgs()
                 .optionalArg(true)
@@ -108,43 +109,50 @@ public class S2ProductDownloader {
                 .build());
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
                 .longOpt("cloudpercentage")
-                .argName("cloud.percentage")
+                .argName("number between 0 and 100")
                 .desc("The threshold for cloud coverage of the products. Below this threshold, the products will be ignored. Default is 30.")
                 .hasArg()
                 .optionalArg(true)
                 .build());
         options.addOption(Option.builder(Constants.PARAM_START_DATE)
                 .longOpt("startdate")
-                .argName("start.date")
+                .argName("yyyy-MM-dd")
                 .desc("Look for products from a specific date (formatted as yyyy-MM-dd). Default is current date -7 days")
                 .hasArg()
                 .optionalArg(true)
                 .build());
         options.addOption(Option.builder(Constants.PARAM_END_DATE)
                 .longOpt("enddate")
-                .argName("end.date")
+                .argName("yyyy-MM-dd")
                 .desc("Look for products up to (and including) a specific date (formatted as yyyy-MM-dd). Default is current date")
                 .hasArg()
                 .optionalArg(true)
                 .build());
         options.addOption(Option.builder(Constants.PARAM_RESULTS_LIMIT)
                 .longOpt("limit")
-                .argName("limit")
+                .argName("integer greater than 1")
                 .desc("The maximum number of products returned. Default is 10.")
                 .hasArg()
                 .optionalArg(true)
                 .build());
         options.addOption(Option.builder(Constants.PARAM_DOWNLOAD_STORE)
                 .longOpt("store")
-                .argName("store")
+                .argName("AWS|SCIHUB")
                 .desc("Store of products being downloaded. Supported values are AWS or SCIHUB")
                 .hasArg(true)
                 .optionalArg(true)
                 .build());
         options.addOption(Option.builder(Constants.PARAM_RELATIVE_ORBIT)
                 .longOpt("relative.orbit")
-                .argName("relative.orbit")
+                .argName("integer")
                 .desc("Relative orbit number")
+                .hasArg(true)
+                .optionalArg(true)
+                .build());
+        options.addOption(Option.builder(Constants.PARAM_FILL_ANGLES)
+                .longOpt("ma")
+                .argName("NONE|NAN|INTERPOLATE")
+                .desc("Interpolate missing angles grids (if some are absent)")
                 .hasArg(true)
                 .optionalArg(true)
                 .build());
@@ -169,48 +177,41 @@ public class S2ProductDownloader {
                 .longOpt("unpacked")
                 .argName("unpacked")
                 .desc("Download unpacked products (SciHub only)")
-                .hasArg(true)
-                .optionalArg(true)
-                .build());
-        options.addOption(Option.builder(Constants.PARAM_FLAG_ANGLES)
-                .longOpt("ma")
-                .argName("missing.angles")
-                .desc("Interpolate missing angles grids (if some are absent)")
                 .hasArg(false)
                 .optionalArg(true)
                 .build());
         /*
          * Proxy parameters
          */
-        options.addOption(Option.builder("ptype")
+        options.addOption(Option.builder(Constants.PARAM_PROXY_TYPE)
                 .longOpt("proxy.type")
-                .argName("proxy.type")
+                .argName("http|socks")
                 .desc("Proxy type (http or socks)")
                 .hasArg(true)
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("phost")
+        options.addOption(Option.builder(Constants.PARAM_PROXY_HOST)
                 .longOpt("proxy.host")
                 .argName("proxy.host")
                 .desc("Proxy host")
                 .hasArg(true)
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("pport")
+        options.addOption(Option.builder(Constants.PARAM_PROXY_PORT)
                 .longOpt("proxy.port")
-                .argName("proxy.port")
+                .argName("integer greater than 0")
                 .desc("Proxy port")
                 .hasArg(true)
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("puser")
+        options.addOption(Option.builder(Constants.PARAM_PROXY_USER)
                 .longOpt("proxy.user")
                 .argName("proxy.user")
                 .desc("Proxy user")
                 .hasArg(true)
                 .optionalArg(true)
                 .build());
-        options.addOption(Option.builder("ppwd")
+        options.addOption(Option.builder(Constants.PARAM_PROXY_PASSWORD)
                 .longOpt("proxy.password")
                 .argName("proxy.password")
                 .desc("Proxy password")
@@ -237,20 +238,20 @@ public class S2ProductDownloader {
         Polygon2D areaOfInterest = new Polygon2D();
         ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE, ProductStore.SCIHUB.toString()));
 
-        String proxyType = commandLine.hasOption("ptype") ?
-                commandLine.getOptionValue("ptype") :
+        String proxyType = commandLine.hasOption(Constants.PARAM_PROXY_TYPE) ?
+                commandLine.getOptionValue(Constants.PARAM_PROXY_TYPE) :
                 nullIfEmpty(props.getProperty("proxy.type", null));
-        String proxyHost = commandLine.hasOption("phost") ?
-                commandLine.getOptionValue("phost") :
+        String proxyHost = commandLine.hasOption(Constants.PARAM_PROXY_HOST) ?
+                commandLine.getOptionValue(Constants.PARAM_PROXY_HOST) :
                 nullIfEmpty(props.getProperty("proxy.host", null));
-        String proxyPort = commandLine.hasOption("pport") ?
-                commandLine.getOptionValue("pport") :
+        String proxyPort = commandLine.hasOption(Constants.PARAM_PROXY_PORT) ?
+                commandLine.getOptionValue(Constants.PARAM_PROXY_PORT) :
                 nullIfEmpty(props.getProperty("proxy.port", null));
-        String proxyUser = commandLine.hasOption("puser") ?
-                commandLine.getOptionValue("puser") :
+        String proxyUser = commandLine.hasOption(Constants.PARAM_PROXY_USER) ?
+                commandLine.getOptionValue(Constants.PARAM_PROXY_USER) :
                 nullIfEmpty(props.getProperty("proxy.user", null));
-        String proxyPwd = commandLine.hasOption("ppwd") ?
-                commandLine.getOptionValue("ppwd") :
+        String proxyPwd = commandLine.hasOption(Constants.PARAM_PROXY_PASSWORD) ?
+                commandLine.getOptionValue(Constants.PARAM_PROXY_PASSWORD) :
                 nullIfEmpty(props.getProperty("proxy.pwd", null));
         NetUtils.setProxy(proxyType, proxyHost, proxyPort == null ? 0 : Integer.parseInt(proxyPort), proxyUser, proxyPwd);
 
@@ -341,7 +342,10 @@ public class S2ProductDownloader {
 
         downloader.shouldCompress(commandLine.hasOption(Constants.PARAM_FLAG_COMPRESS));
         downloader.shouldDeleteAfterCompression(commandLine.hasOption(Constants.PARAM_FLAG_DELETE));
-        downloader.shouldFillMissingAngles(commandLine.hasOption(Constants.PARAM_FLAG_ANGLES));
+        if (commandLine.hasOption(Constants.PARAM_FILL_ANGLES)) {
+            downloader.setFillMissingAnglesMethod(Enum.valueOf(FillAnglesMethod.class,
+                                                                commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase()));
+        }
 
         int numPoints = areaOfInterest.getNumPoints();
         if (numPoints > 0) {

@@ -38,6 +38,11 @@ public class Constants {
     public static final String LEVEL_2 = "        ";
     public static final String LEVEL_3 = "          ";
     public static final String LEVEL_4 = "            ";
-    public static final String PARAM_FLAG_ANGLES = "ma";
+    public static final String PARAM_FILL_ANGLES = "ma";
     public static final String SEARCH_PARAM_RELATIVE_ORBIT_NUMBER = "relativeOrbitNumber";
+    public static final String PARAM_PROXY_TYPE = "ptype";
+    public static final String PARAM_PROXY_HOST = "phost";
+    public static final String PARAM_PROXY_PORT = "pport";
+    public static final String PARAM_PROXY_USER = "puser";
+    public static final String PARAM_PROXY_PASSWORD = "ppwd";
 }

@@ -3,10 +3,7 @@ package ro.cs.s2;
 import ro.cs.s2.util.Logger;
 import ro.cs.s2.util.NetUtils;
 import ro.cs.s2.util.Zipper;
-import ro.cs.s2.workaround.AngleGrid;
-import ro.cs.s2.workaround.MetaGrid;
-import ro.cs.s2.workaround.ViewingIncidenceAngleGrid;
-import ro.cs.s2.workaround.XmlAnglesReader;
+import ro.cs.s2.workaround.*;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -72,7 +69,7 @@ public class ProductDownloader {
 
     private boolean shouldCompress;
     private boolean shouldDeleteAfterCompression;
-    private boolean shouldFillMissingAngles;
+    private FillAnglesMethod fillMissingAnglesMethod;
 
     private ProductStore store;
 
@@ -85,11 +82,11 @@ public class ProductDownloader {
         } catch (IOException e) {
             Logger.error("Cannot load properties file. Reason: %s", e.getMessage());
         }
-        zipsUrl = props.getProperty("aws.products.url", "http://sentinel-s2-l1c.s3.amazonaws.com");
+        zipsUrl = props.getProperty("s2.aws.products.url", "http://sentinel-s2-l1c.s3.amazonaws.com");
         if (!zipsUrl.endsWith("/"))
             zipsUrl += "/";
         zipsUrl += "zips/";
-        baseUrl = props.getProperty("aws.tiles.url", "http://sentinel-s2-l1c.s3-website.eu-central-1.amazonaws.com");
+        baseUrl = props.getProperty("s2.aws.tiles.url", "http://sentinel-s2-l1c.s3-website.eu-central-1.amazonaws.com");
         if (!baseUrl.endsWith("/"))
             baseUrl += "/";
         productsUrl = baseUrl + "products/";
@@ -104,6 +101,7 @@ public class ProductDownloader {
         odp.root(odataProductPath).node("GRANULE").node("${tile}");
         odataTilePath = odp.path();
         odataMetadataPath = odp.root(odataProductPath).node("${xmlname}.xml").value();
+        fillMissingAnglesMethod = FillAnglesMethod.NONE;
     }
 
     public void setDownloadStore(ProductStore store) {
@@ -136,8 +134,8 @@ public class ProductDownloader {
         this.shouldDeleteAfterCompression = shouldDeleteAfterCompression;
     }
 
-    public void shouldFillMissingAngles(boolean value) {
-        this.shouldFillMissingAngles = value;
+    public void setFillMissingAnglesMethod(FillAnglesMethod value) {
+        this.fillMissingAnglesMethod = value;
     }
 
     public boolean downloadProducts(List<ProductDescriptor> products){
@@ -262,7 +260,7 @@ public class ProductDownloader {
                                 int gridCount = filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
                                 if (gridCount != 13 * 12) {
                                     Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
-                                    if (this.shouldFillMissingAngles) {
+                                    if (!FillAnglesMethod.NONE.equals(this.fillMissingAnglesMethod)) {
                                         Map<String, MetaGrid> angleGridMap = XmlAnglesReader.parse(metadataFile);
                                         List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
                                         StringBuilder lines = new StringBuilder();
@@ -386,7 +384,7 @@ public class ProductDownloader {
                             int gridCount = filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
                             if (gridCount != 13 * 12) {
                                 Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
-                                if(this.shouldFillMissingAngles) {
+                                if (!FillAnglesMethod.NONE.equals(this.fillMissingAnglesMethod)) {
                                     try {
                                         Map<String, MetaGrid> angleGridMap = XmlAnglesReader.parse(tileMetaFile);
                                         List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
@@ -624,6 +622,8 @@ public class ProductDownloader {
     private List<ViewingIncidenceAngleGrid> computeMissingAngles(Map<String, MetaGrid> angleGridMap) {
         MetaGrid zeniths = angleGridMap.get("Zenith");
         MetaGrid azimuths = angleGridMap.get("Azimuth");
+        zeniths.setFillMethod(this.fillMissingAnglesMethod);
+        azimuths.setFillMethod(this.fillMissingAnglesMethod);
         List<ViewingIncidenceAngleGrid> computedGrids = new ArrayList<>();
         Set<Integer> missingBandIds = zeniths.fillGaps();
         azimuths.fillGaps();

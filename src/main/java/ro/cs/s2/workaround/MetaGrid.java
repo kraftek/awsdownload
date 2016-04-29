@@ -11,6 +11,7 @@ public class MetaGrid {
     private Map<Integer, Integer> bandIndices;
     private int rows;
     private int cols;
+    private FillAnglesMethod method;
 
     public MetaGrid(int[] bandsOrder, int rows, int cols) {
         int bands = bandsOrder != null ? bandsOrder.length : 13;
@@ -27,11 +28,16 @@ public class MetaGrid {
         }
         this.rows = rows;
         this.cols = cols;
+        this.method = FillAnglesMethod.NONE;
         /*for (int i = 0; i < angleGrids.length; i++) {
             for (int j = 0; j < angleGrids[0].length; j++) {
                 angleGrids[i][j] = createEmpty();
             }
         }*/
+    }
+
+    public void setFillMethod(FillAnglesMethod method) {
+        this.method = method;
     }
 
     public void addGrid(int detectorId, int bandId, AngleGrid grid) {
@@ -102,19 +108,23 @@ public class MetaGrid {
     }
 
     private void fillDetectorGaps(int detectorId) {
-        AngleGrid[] detGrids = angleGrids[detectorId];
-        for (int row = 0; row < rows; row++) {
-            double[] values = new double[detGrids.length];
-            for (int col = 0; col < cols; col++) {
-                for (int b = 0; b < values.length; b++) {
-                    if (detGrids[b] == null) {
-                        detGrids[b] = createEmpty();
+        if (!FillAnglesMethod.NONE.equals(method)) {
+            AngleGrid[] detGrids = angleGrids[detectorId];
+            for (int row = 0; row < rows; row++) {
+                double[] values = new double[detGrids.length];
+                for (int col = 0; col < cols; col++) {
+                    for (int b = 0; b < values.length; b++) {
+                        if (detGrids[b] == null) {
+                            detGrids[b] = createEmpty();
+                        }
+                        values[b] = detGrids[b].getValueAt(row, col);
                     }
-                    values[b] = detGrids[b].getValueAt(row, col);
-                }
-                values = interpolate(values);
-                for (int b = 0; b < values.length; b++) {
-                    detGrids[b].setValueAt(row, col, values[b]);
+                    if (FillAnglesMethod.INTERPOLATE.equals(method)) {
+                        values = interpolate(values);
+                        for (int b = 0; b < values.length; b++) {
+                            detGrids[b].setValueAt(row, col, values[b]);
+                        }
+                    }
                 }
             }
         }

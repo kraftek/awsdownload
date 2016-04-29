@@ -46,8 +46,10 @@ public class NetUtils {
                     return new PasswordAuthentication(user, pwd.toCharArray());
                 }
             });
-            proxyCredentials = new BasicCredentialsProvider();
-            proxyCredentials.setCredentials(new AuthScope(host, port), new UsernamePasswordCredentials(user, pwd));
+            if (user != null && pwd != null) {
+                proxyCredentials = new BasicCredentialsProvider();
+                proxyCredentials.setCredentials(new AuthScope(host, port), new UsernamePasswordCredentials(user, pwd));
+            }
             apacheHttpProxy = new HttpHost(host, port, proxyType.name());
         }
     }
