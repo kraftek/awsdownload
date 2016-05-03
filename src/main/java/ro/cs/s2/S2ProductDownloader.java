@@ -27,33 +27,75 @@ public class S2ProductDownloader {
 
     static {
         options = new Options();
-        /*
-         * List-valued parameters
-         */
-        options.addOption(Option.builder(Constants.PARAM_AREA)
+
+        options.addOption(Option.builder(Constants.PARAM_OUT_FOLDER)
+                .longOpt("out")
+                .argName("output.folder")
+                .desc("The folder in which the products will be downloaded")
+                .hasArg()
+                .required()
+                .build());
+
+        Option optionArea = Option.builder(Constants.PARAM_AREA)
                 .longOpt("area")
                 .argName("lon1 lat1, lon2 lat2, ...")
                 .desc("A closed polygon whose vertices are given in <lon lat> pairs, comma-separated")
                 .hasArgs()
                 .optionalArg(true)
                 .valueSeparator(' ')
-                .build());
-        options.addOption(Option.builder(Constants.PARAM_TILE_LIST)
+                .build();
+        Option optionAreaFile = Option.builder(Constants.PARAM_AREA_FILE)
+                .longOpt("areafile")
+                .argName("aoi.file")
+                .desc("The file containing a closed polygon whose vertices are given in <lon lat> pairs, comma-separated")
+                .hasArg()
+                .optionalArg(true)
+                .build();
+        OptionGroup areaGroup = new OptionGroup();
+        areaGroup.addOption(optionArea);
+        areaGroup.addOption(optionAreaFile);
+        options.addOptionGroup(areaGroup);
+
+        Option optionTileList = Option.builder(Constants.PARAM_TILE_LIST)
                 .longOpt("tiles")
                 .argName("tileId1 tileId2 ...")
                 .desc("A list of S2 tile IDs, space-separated")
                 .hasArgs()
                 .optionalArg(true)
                 .valueSeparator(' ')
-                .build());
-        options.addOption(Option.builder(Constants.PARAM_PRODUCT_LIST)
+                .build();
+        Option optionTileFile = Option.builder(Constants.PARAM_TILE_LIST_FILE)
+                .longOpt("tilefile")
+                .argName("tile.file")
+                .desc("A file containing a list of S2 tile IDs, one tile id per line")
+                .hasArg()
+                .optionalArg(true)
+                .build();
+        OptionGroup tileGroup = new OptionGroup();
+        tileGroup.addOption(optionTileList);
+        tileGroup.addOption(optionTileFile);
+        options.addOptionGroup(tileGroup);
+
+        Option optionProductList = Option.builder(Constants.PARAM_PRODUCT_LIST)
                 .longOpt("products")
                 .argName("product1 product2 ...")
                 .desc("A list of S2 product names, space-separated")
                 .hasArgs()
                 .optionalArg(true)
                 .valueSeparator(' ')
-                .build());
+                .build();
+        Option optionProductFile = Option.builder(Constants.PARAM_PRODUCT_LIST_FILE)
+                .longOpt("productfile")
+                .argName("product.file")
+                .desc("A file containing a list of S2 products, one product name per line")
+                .hasArg()
+                .optionalArg(true)
+                .build();
+        OptionGroup productGroup = new OptionGroup();
+        productGroup.addOption(optionProductList);
+        productGroup.addOption(optionProductFile);
+        options.addOptionGroup(productGroup);
+
         options.addOption(Option.builder(Constants.PARAM_PRODUCT_UUID_LIST)
                 .longOpt("uuid")
                 .argName("uuid1 uui2 ...")
@@ -62,16 +104,7 @@ public class S2ProductDownloader {
                 .optionalArg(true)
                 .valueSeparator(' ')
                 .build());
-        /*
-         * Single-valued parameters
-         */
-        options.addOption(Option.builder(Constants.PARAM_OUT_FOLDER)
-                .longOpt("out")
-                .argName("output.folder")
-                .desc("The folder in which the products will be downloaded")
-                .hasArg()
-                .required()
-                .build());
+
         options.addOption(Option.builder(Constants.PARAM_USER)
                 .longOpt("user")
                 .argName("user")
@@ -86,27 +119,7 @@ public class S2ProductDownloader {
                 .hasArg(true)
                 .required()
                 .build());
-        options.addOption(Option.builder(Constants.PARAM_AREA_FILE)
-                .longOpt("areafile")
-                .argName("aoi.file")
-                .desc("The file containing a closed polygon whose vertices are given in <lon lat> pairs, comma-separated")
-                .hasArg()
-                .optionalArg(true)
-                .build());
-        options.addOption(Option.builder(Constants.PARAM_TILE_LIST_FILE)
-                .longOpt("tilefile")
-                .argName("tile.file")
-                .desc("A file containing a list of S2 tile IDs, one tile id per line")
-                .hasArg()
-                .optionalArg(true)
-                .build());
-        options.addOption(Option.builder(Constants.PARAM_PRODUCT_LIST_FILE)
-                .longOpt("productfile")
-                .argName("product.file")
-                .desc("A file containing a list of S2 products, one product name per line")
-                .hasArg()
-                .optionalArg(true)
-                .build());
+
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
                 .longOpt("cloudpercentage")
                 .argName("number between 0 and 100")
@@ -344,7 +357,9 @@ public class S2ProductDownloader {
         downloader.shouldDeleteAfterCompression(commandLine.hasOption(Constants.PARAM_FLAG_DELETE));
         if (commandLine.hasOption(Constants.PARAM_FILL_ANGLES)) {
             downloader.setFillMissingAnglesMethod(Enum.valueOf(FillAnglesMethod.class,
-                                                                commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase()));
+                    commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
+                            commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase() :
+                            FillAnglesMethod.NONE.name()));
         }
 
         int numPoints = areaOfInterest.getNumPoints();
