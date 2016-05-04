@@ -159,7 +159,6 @@ public class ProductDownloader {
                 if (file != null && Files.exists(file)) {
                     Logger.info("Product download completed in %s", formatTime(millis));
                 } else {
-                    //Logger.warn("Product download failed");
                     failedProducts++;
                 }
             }
@@ -349,11 +348,17 @@ public class ProductDownloader {
             Path metadataFile = rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
             currentStep = "Metadata";
             downloadFile(url, metadataFile);
+            Path inspireFile = metadataFile.resolveSibling("inspire.xml");
+            Path manifestFile = metadataFile.resolveSibling("manifest.safe");
+            Path previewFile = metadataFile.resolveSibling("preview.png");
             if (Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
                 List<String> metaTileNames = filter(allLines, "<Granules");
                 boolean hasTiles = updateMedatata(metadataFile, allLines);
                 if (hasTiles) {
+                    downloadFile(baseProductUrl + "inspire.xml", inspireFile);
+                    downloadFile(baseProductUrl + "manifest.safe", manifestFile);
+                    downloadFile(baseProductUrl + "preview.png", previewFile);
                     Path tilesFolder = ensureExists(rootPath.resolve("GRANULE"));
                     ensureExists(rootPath.resolve("AUX_DATA"));
                     Path dataStripFolder = ensureExists(rootPath.resolve("DATASTRIP"));
@@ -517,13 +522,6 @@ public class ProductDownloader {
         HttpURLConnection connection = null;
         Path tmpFile = null;
         try {
-//            URL url = new URL(remoteUrl);
-//            connection = (HttpURLConnection) url.openConnection();
-//            connection.setConnectTimeout(TIMEOUT);
-//            connection.setReadTimeout(TIMEOUT);
-//            if (store == ProductStore.SCIHUB) {
-//                connection.setRequestProperty("Authorization", NetUtils.getAuthToken());
-//            }
             connection = NetUtils.openConnection(remoteUrl, store == ProductStore.SCIHUB ? NetUtils.getAuthToken() : null);
             if (!Files.exists(file)) {
                 long remoteFileLength = connection.getContentLengthLong();

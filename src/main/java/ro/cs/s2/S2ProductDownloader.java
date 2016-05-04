@@ -38,8 +38,8 @@ public class S2ProductDownloader {
 
         Option optionArea = Option.builder(Constants.PARAM_AREA)
                 .longOpt("area")
-                .argName("lon1 lat1, lon2 lat2, ...")
-                .desc("A closed polygon whose vertices are given in <lon lat> pairs, comma-separated")
+                .argName("lon1,lat1 lon2,lat2 ...")
+                .desc("A closed polygon whose vertices are given in <lon,lat> pairs, space-separated")
                 .hasArgs()
                 .optionalArg(true)
                 .valueSeparator(' ')

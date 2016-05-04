@@ -20,11 +20,11 @@ Filtering on products is mutually exclusive with filtering on an area of interes
 2. Build and package the project:
     mvn clean package -DskipTests=true
 3. The folder "lib" and the generated jar should be placed on the same folder. Then:
-    java -jar AWSS2ProductDownload-0.2.jar
+    java -jar S2ProductDownloader-1.0.jar
    for a list of supported command line arguments.
 
 A simple example:
-    java -jar AWSS2ProductDownload-0.2.jar --out D:\Products --tiles 34TFQ 35TNL --products S2A_OPER_PRD_MSIL1C_PDMC_20160103T183955_R064_V20160103T085753_20160103T085753 --store AWS
+    java -jar S2ProductDownloader-1.0 --out D:\Products --tiles 34TFQ 35TNL --products S2A_OPER_PRD_MSIL1C_PDMC_20160103T183955_R064_V20160103T085753_20160103T085753 --store AWS
 
 #Configuration considerations
-In order to use your own SciHub account, please edit the corresponding properties in the src/main/java/resources/ro/cs/s2/download.properties file.
+It may be possible that you are behind a proxy. In this case, please either pass the proxy arguments from command line or edit the download.properties file and set them accordingly.
