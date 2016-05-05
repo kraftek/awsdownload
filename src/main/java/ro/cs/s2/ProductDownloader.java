@@ -1,5 +1,6 @@
 package ro.cs.s2;
 
+import ro.cs.s2.util.Constants;
 import ro.cs.s2.util.Logger;
 import ro.cs.s2.util.NetUtils;
 import ro.cs.s2.util.Zipper;
@@ -264,21 +265,28 @@ public class ProductDownloader {
                                         List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
                                         StringBuilder lines = new StringBuilder();
                                         String message = "Angle grids have been computed for ";
-                                        Set<Integer> missingBandIds = new TreeSet<>();
+                                        Map<Integer, Set<Integer>> missingBandIds = new TreeMap<>();
                                         for (ViewingIncidenceAngleGrid missingGrid : missingAngles) {
                                             lines.append(missingGrid.toString());
-                                            missingBandIds.add(missingGrid.getBandId());
+                                            int bandId = missingGrid.getBandId();
+                                            if (!missingBandIds.containsKey(bandId)) {
+                                                missingBandIds.put(bandId, new TreeSet<Integer>());
+                                            }
+                                            missingBandIds.get(bandId).add(missingGrid.getDetectorId());
                                         }
                                         if (missingBandIds.isEmpty()) {
                                             message += String.valueOf(13*12-gridCount) + " missing detectors";
                                         } else {
-                                            message += "the bands ";
-                                            for (Integer bandId : missingBandIds) {
-                                                message = message + String.valueOf(bandId) + "; ";
+                                            for (Map.Entry<Integer, Set<Integer>> e : missingBandIds.entrySet()) {
+                                                message += "band " + String.valueOf(e.getKey()) + " [detectors: " + join(e.getValue(), ",") + "]; ";
+                                                /*for (Integer d : e.getValue()) {
+                                                    message += Integer.valueOf(d) + ",";
+                                                }
+                                                message = message.substring(0, message.length() - 1) + "];";*/
                                             }
                                         }
                                         String[] tokens = lines.toString().split("\n");
-                                        if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(missingAngles, true), computeMeanAngles(missingAngles, false)))) {
+                                        if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(angleGridMap, missingAngles, true), computeMeanAngles(angleGridMap, missingAngles, false)))) {
                                             Logger.warn("Metadata for tile %s has not been updated!", tileName);
                                         } else {
                                             Logger.info(message);
@@ -395,22 +403,28 @@ public class ProductDownloader {
                                         List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
                                         StringBuilder lines = new StringBuilder();
                                         String message = "Angle grids have been computed for ";
-                                        Set<Integer> missingBandIds = new TreeSet<>();
-
+                                        Map<Integer, Set<Integer>> missingBandIds = new TreeMap<>();
                                         for (ViewingIncidenceAngleGrid missingGrid : missingAngles) {
                                             lines.append(missingGrid.toString());
-                                            missingBandIds.add(missingGrid.getBandId());
+                                            int bandId = missingGrid.getBandId();
+                                            if (!missingBandIds.containsKey(bandId)) {
+                                                missingBandIds.put(bandId, new TreeSet<Integer>());
+                                            }
+                                            missingBandIds.get(bandId).add(missingGrid.getDetectorId());
                                         }
                                         if (missingBandIds.isEmpty()) {
-                                            message += String.valueOf(13*12 - gridCount) + " missing detectors";
+                                            message += String.valueOf(13*12-gridCount) + " missing detectors";
                                         } else {
-                                            message += "the bands ";
-                                            for (Integer bandId : missingBandIds) {
-                                                message = message + String.valueOf(bandId) + "; ";
+                                            for (Map.Entry<Integer, Set<Integer>> e : missingBandIds.entrySet()) {
+                                                message += "band " + String.valueOf(e.getKey()) + " [detectors: " + join(e.getValue(), ",") + "]; ";
+                                                /*for (Integer d : e.getValue()) {
+                                                    message += Integer.valueOf(d) + ",";
+                                                }*/
+                                                //message = message.substring(0, message.length() - 1) + "]; ";
                                             }
                                         }
                                         String[] tokens = lines.toString().split("\n");
-                                        if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(missingAngles, true), computeMeanAngles(missingAngles, false)))) {
+                                        if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(angleGridMap, missingAngles, true), computeMeanAngles(angleGridMap, missingAngles, false)))) {
                                             Logger.warn("Metadata for tile %s has not been updated!", tileName);
                                         } else {
                                             Logger.info(message);
@@ -623,46 +637,47 @@ public class ProductDownloader {
         zeniths.setFillMethod(this.fillMissingAnglesMethod);
         azimuths.setFillMethod(this.fillMissingAnglesMethod);
         List<ViewingIncidenceAngleGrid> computedGrids = new ArrayList<>();
-        Set<Integer> missingBandIds = zeniths.fillGaps();
+        Set<Integer[]> missingPairs = zeniths.fillGaps();
         azimuths.fillGaps();
-        for(int bandId = 0; bandId < 13; ++bandId) {
-            if (missingBandIds.contains(bandId)) {
-                List<AngleGrid> zenithsBandGrids = zeniths.getBandGrids(bandId);
-                List<AngleGrid> azimuthsBandGrids = azimuths.getBandGrids(bandId);
-                for (int detectorId = 0; detectorId < zenithsBandGrids.size(); detectorId++) {
-                    ViewingIncidenceAngleGrid grid = new ViewingIncidenceAngleGrid(bandId, detectorId);
-                    grid.setZenith(zenithsBandGrids.get(detectorId));
-                    grid.setAzimuth(azimuthsBandGrids.get(detectorId));
-                    computedGrids.add(grid);
-                }
-            }
+        for (Integer[] pair : missingPairs) {
+            int bandId = pair[0];
+            int detectorId = pair[1];
+            ViewingIncidenceAngleGrid grid = new ViewingIncidenceAngleGrid(bandId, detectorId - 1);
+            grid.setZenith(zeniths.getGrid(bandId, detectorId));
+            grid.setAzimuth(azimuths.getGrid(bandId, detectorId));
+            computedGrids.add(grid);
         }
 
         return computedGrids;
     }
 
-    private Map<Integer, Double> computeMeanAngles(List<ViewingIncidenceAngleGrid> missingGrids, boolean isZenith) {
+    private Map<Integer, Double> computeMeanAngles(Map<String, MetaGrid> angleGridMap, List<ViewingIncidenceAngleGrid> missingGrids, boolean isZenith) {
         Map<Integer, Double> means = new HashMap<>();
         Map<Integer, Integer> nonNaNCounts = new HashMap<>();
+        Map<Integer, MeanBandAngle> bandMeanAngles = angleGridMap.get("Zenith").getBandMeanAngles();
         for (ViewingIncidenceAngleGrid grid : missingGrids) {
             int bandId = grid.getBandId();
-            double meanValue = (isZenith ? grid.getZenith() : grid.getAzimuth()).meanValue();
-            if(!Double.isNaN(meanValue)) {
-                if(!means.containsKey(bandId)) {
-                    means.put(bandId, meanValue);
-                } else {
-                    means.put(bandId, means.get(bandId) + meanValue);
-                }
+            if (!bandMeanAngles.containsKey(bandId)) {
+                double meanValue = (isZenith ? grid.getZenith() : grid.getAzimuth()).meanValue();
+                if (!Double.isNaN(meanValue)) {
+                    if (!means.containsKey(bandId)) {
+                        means.put(bandId, meanValue);
+                    } else {
+                        means.put(bandId, means.get(bandId) + meanValue);
+                    }
 
-                if(!nonNaNCounts.containsKey(bandId)) {
-                    nonNaNCounts.put(bandId, 1);
-                } else {
-                    nonNaNCounts.put(bandId, nonNaNCounts.get(bandId) + 1);
+                    if (!nonNaNCounts.containsKey(bandId)) {
+                        nonNaNCounts.put(bandId, 1);
+                    } else {
+                        nonNaNCounts.put(bandId, nonNaNCounts.get(bandId) + 1);
+                    }
                 }
             }
         }
         for (Integer bandId : means.keySet()) {
-            means.put(bandId, means.get(bandId) / (double) (nonNaNCounts.containsKey(bandId) ? nonNaNCounts.get(bandId) : 1));
+            means.put(bandId, means.containsKey(bandId) ?
+                                (means.get(bandId) / (double) (nonNaNCounts.containsKey(bandId) ? nonNaNCounts.get(bandId) : 1)) :
+                                Double.NaN);
         }
 
         return means;
@@ -670,30 +685,18 @@ public class ProductDownloader {
 
     private List<String> meansToXml(Map<Integer, Double> zenithMeans, Map<Integer, Double> azimuthMeans) {
         StringBuilder buffer = new StringBuilder();
-        Iterator var4;
-        int bandId;
-        if(zenithMeans.size() >= azimuthMeans.size()) {
-            var4 = zenithMeans.keySet().iterator();
-
-            while(var4.hasNext()) {
-                bandId = (Integer) var4.next();
-                buffer.append("        ").append("<Mean_Viewing_Incidence_Angle bandId=\"").append(bandId).append("\">\n");
-                buffer.append("          ").append("<ZENITH_ANGLE unit=\"deg\">").append(zenithMeans.get(bandId)).append("</ZENITH_ANGLE>\n");
-                buffer.append("          ").append("<AZIMUTH_ANGLE unit=\"deg\">").append(azimuthMeans.containsKey(bandId)?(Serializable)azimuthMeans.get(bandId):"NaN").append("</AZIMUTH_ANGLE>\n");
-                buffer.append("        ").append("</Mean_Viewing_Incidence_Angle>\n");
+        if(zenithMeans.size() == azimuthMeans.size() && zenithMeans.size() > 0) {
+            for (Integer bandId : zenithMeans.keySet()) {
+                buffer.append(Constants.LEVEL_2).append("<Mean_Viewing_Incidence_Angle bandId=\"").append(bandId).append("\">\n");
+                buffer.append(Constants.LEVEL_3).append("<ZENITH_ANGLE unit=\"deg\">").append(zenithMeans.get(bandId)).append("</ZENITH_ANGLE>\n");
+                buffer.append(Constants.LEVEL_3).append("<AZIMUTH_ANGLE unit=\"deg\">").append(azimuthMeans.containsKey(bandId)?(Serializable)azimuthMeans.get(bandId):"NaN").append("</AZIMUTH_ANGLE>\n");
+                buffer.append(Constants.LEVEL_2).append("</Mean_Viewing_Incidence_Angle>\n");
             }
-        } else {
-            var4 = azimuthMeans.keySet().iterator();
-
-            while(var4.hasNext()) {
-                bandId = (Integer) var4.next();
-                buffer.append("        ").append("<Mean_Viewing_Incidence_Angle bandId=\"").append(bandId).append("\">\n");
-                buffer.append("          ").append("<ZENITH_ANGLE unit=\"deg\">").append(zenithMeans.containsKey(bandId)?(Serializable)zenithMeans.get(bandId):"NaN").append("</ZENITH_ANGLE>\n");
-                buffer.append("          ").append("<AZIMUTH_ANGLE unit=\"deg\">").append(azimuthMeans.get(bandId)).append("</AZIMUTH_ANGLE>\n");
-                buffer.append("        ").append("</Mean_Viewing_Incidence_Angle>\n");
-            }
+            Logger.info("Mean angles have been computed for bands " + join(zenithMeans.keySet(), ","));
         }
-
+        if (zenithMeans.size() == 0) {
+            Logger.info("No mean angle has been computed");
+        }
         return Arrays.asList(buffer.toString().split("\n"));
     }
 
@@ -723,7 +726,7 @@ public class ProductDownloader {
 
     private boolean insertAngles(Path metaFile, List<String> originalLines, List<String> gridLines, List<String> meanLines) throws IOException {
         boolean gridUpdated = false;
-        boolean meansUpdated = false;
+        boolean meansUpdated = meanLines.isEmpty();
         int lineCount = originalLines.size();
 
         for(int idx = 0; idx < lineCount; ++idx) {
@@ -746,6 +749,21 @@ public class ProductDownloader {
         }
 
         return gridUpdated && meansUpdated;
+    }
+
+    private String join(Iterable collection, String separator) {
+        String result = "";
+        if (collection != null) {
+            boolean hasElements = false;
+            for (Object aCollection : collection) {
+                hasElements = true;
+                result += (aCollection != null ? aCollection.toString() : "null") + separator;
+            }
+            if (hasElements) {
+                result = result.substring(0, result.length() - separator.length());
+            }
+        }
+        return result;
     }
 
     private class ODataPath {

@@ -12,6 +12,7 @@ public class MetaGrid {
     private int rows;
     private int cols;
     private FillAnglesMethod method;
+    private Map<Integer, MeanBandAngle> bandMeanAngles;
 
     public MetaGrid(int[] bandsOrder, int rows, int cols) {
         int bands = bandsOrder != null ? bandsOrder.length : 13;
@@ -29,11 +30,7 @@ public class MetaGrid {
         this.rows = rows;
         this.cols = cols;
         this.method = FillAnglesMethod.NONE;
-        /*for (int i = 0; i < angleGrids.length; i++) {
-            for (int j = 0; j < angleGrids[0].length; j++) {
-                angleGrids[i][j] = createEmpty();
-            }
-        }*/
+        this.bandMeanAngles = new HashMap<>();
     }
 
     public void setFillMethod(FillAnglesMethod method) {
@@ -75,6 +72,14 @@ public class MetaGrid {
         return bandId;
     }
 
+    public void setBandMeanAngles(MeanBandAngle meanAngles) {
+        if (meanAngles != null) {
+            this.bandMeanAngles.put(meanAngles.getBandId(), meanAngles);
+        }
+    }
+
+    public Map<Integer, MeanBandAngle> getBandMeanAngles() { return this.bandMeanAngles; }
+
     public double getBandMeanValue(int bandId) {
         checkValidIndices(0, bandId);
         int bandIdx = bandIndices.get(bandId);
@@ -92,12 +97,14 @@ public class MetaGrid {
         return count > 0 ? sum / (double) count : Double.NaN;
     }
 
-    public Set<Integer> fillGaps() {
-        Set<Integer> missingBands = new TreeSet<>();
+    public Set<Integer[]> fillGaps() {
+        Set<Integer[]> missingBands = new HashSet<>();
         if (angleGrids.length > 0) {
-            for (int i = 0; i < angleGrids[0].length; i++) {
-                if (angleGrids[0][i] == null) {
-                    missingBands.add(getBandIdFromIndex(i));
+            for (int j = 0; j < angleGrids.length; j++) {
+                for (int i = 0; i < angleGrids[0].length; i++) {
+                    if (angleGrids[j][i] == null) {
+                        missingBands.add(new Integer[] { getBandIdFromIndex(i), j + 1 });
+                    }
                 }
             }
         }

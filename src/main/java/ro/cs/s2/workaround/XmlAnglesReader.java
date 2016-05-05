@@ -47,6 +47,7 @@ public class XmlAnglesReader {
         private int currentBandId;
         private int currentDetectorId;
         private int currentRow;
+        private MeanBandAngle currentMean;
         private StringBuilder buffer;
 
         protected Handler() {
@@ -101,6 +102,10 @@ public class XmlAnglesReader {
                         this.currentGrid = new AngleGrid();
                         this.currentRow = 0;
                     }
+                    break;
+                case "Mean_Viewing_Incidence_Angle":
+                    this.currentMean = new MeanBandAngle(Integer.parseInt(attributes.getValue("bandId")));
+                    break;
             }
         }
 
@@ -127,6 +132,20 @@ public class XmlAnglesReader {
                     if(this.currentGrid != null) {
                         this.currentGrid.setRowValues(this.currentRow++, this.buffer.toString());
                     }
+                    break;
+                case "ZENITH_ANGLE":
+                    if (this.currentMean != null) {
+                        this.currentMean.setZenith(Double.parseDouble(this.buffer.toString()));
+                    }
+                    break;
+                case "AZIMUTH_ANGLE":
+                    if (this.currentMean != null) {
+                        this.currentMean.setAzimuth(Double.parseDouble(this.buffer.toString()));
+                    }
+                    break;
+                case "Mean_Viewing_Incidence_Angle":
+                    this.result.get("Zenith").setBandMeanAngles(this.currentMean);
+                    break;
             }
 
             this.buffer.setLength(0);
