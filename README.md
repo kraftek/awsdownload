@@ -24,7 +24,7 @@ Filtering on products is mutually exclusive with filtering on an area of interes
    for a list of supported command line arguments.
 
 A simple example:
-    java -jar S2ProductDownloader-1.0 --out D:\Products --tiles 34TFQ 35TNL --products S2A_OPER_PRD_MSIL1C_PDMC_20160103T183955_R064_V20160103T085753_20160103T085753 --store AWS
+    java -jar S2ProductDownloader-1.0.jar --out D:\Products --tiles 34TFQ 35TNL --products S2A_OPER_PRD_MSIL1C_PDMC_20160103T183955_R064_V20160103T085753_20160103T085753 --store AWS
 
 #Configuration considerations
 It may be possible that you are behind a proxy. In this case, please either pass the proxy arguments from command line or edit the download.properties file and set them accordingly.
