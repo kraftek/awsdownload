@@ -9,6 +9,7 @@ public class Constants {
     public static final String PARAM_PRODUCT_LIST = "p";
     public static final String PARAM_PRODUCT_UUID_LIST = "uuid";
     public static final String PARAM_OUT_FOLDER = "o";
+    public static final String PARAM_INPUT_FOLDER = "i";
     public static final String PARAM_AREA_FILE = "af";
     public static final String PARAM_TILE_LIST_FILE = "tf";
     public static final String PARAM_PRODUCT_LIST_FILE = "pf";

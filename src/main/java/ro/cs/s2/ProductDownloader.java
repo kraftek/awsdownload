@@ -1,10 +1,11 @@
 package ro.cs.s2;
 
-import ro.cs.s2.util.Constants;
 import ro.cs.s2.util.Logger;
 import ro.cs.s2.util.NetUtils;
+import ro.cs.s2.util.Utilities;
 import ro.cs.s2.util.Zipper;
-import ro.cs.s2.workaround.*;
+import ro.cs.s2.workaround.FillAnglesMethod;
+import ro.cs.s2.workaround.MetadataRepairer;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -14,11 +15,13 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
+import java.nio.file.FileSystem;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /**
@@ -158,7 +161,7 @@ public class ProductDownloader {
                 }
                 long millis = System.currentTimeMillis() - startTime;
                 if (file != null && Files.exists(file)) {
-                    Logger.info("Product download completed in %s", formatTime(millis));
+                    Logger.info("Product download completed in %s", Utilities.formatTime(millis));
                 } else {
                     failedProducts++;
                 }
@@ -212,7 +215,7 @@ public class ProductDownloader {
             downloadFile(url, metadataFile);
             if (Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
-                List<String> metaTileNames = filter(allLines, "<Granules");
+                List<String> metaTileNames = Utilities.filter(allLines, "<Granules");
                 boolean hasTiles = updateMedatata(metadataFile, allLines);
                 if (hasTiles) {
                     Path tilesFolder = ensureExists(rootPath.resolve("GRANULE"));
@@ -225,12 +228,12 @@ public class ProductDownloader {
                         String tileId = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
                         tileId = tileId.substring(tileId.lastIndexOf(NAME_SEPARATOR) + 2);
                         if (filteredTiles.size() == 0 || filteredTiles.contains(tileId)) {
-                            String granule = getAttributeValue(tileName, "granuleIdentifier");
+                            String granule = Utilities.getAttributeValue(tileName, "granuleIdentifier");
                             tileNames.put(granule, odataTilePath.replace("${UUID}", product.getId())
                                     .replace("${PRODUCT_NAME}", productName)
                                     .replace("${tile}", granule));
                             if (dataStripId == null) {
-                                dataStripId = getAttributeValue(tileName, "datastripIdentifier");
+                                dataStripId = Utilities.getAttributeValue(tileName, "datastripIdentifier");
                             }
                         } else {
                             skippedTiles += tileId + " ";
@@ -256,8 +259,8 @@ public class ProductDownloader {
                         Path tileMetaFile = downloadFile(pathBuilder.root(tileUrl).node(metadataName).value(), tileFolder.resolve(metadataName));
                         if (tileMetaFile != null) {
                             if (Files.exists(tileMetaFile)) {
-                                List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
-                                int gridCount = filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
+                                /*List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
+                                int gridCount = Utilities.filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
                                 if (gridCount != 13 * 12) {
                                     Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
                                     if (!FillAnglesMethod.NONE.equals(this.fillMissingAnglesMethod)) {
@@ -278,11 +281,11 @@ public class ProductDownloader {
                                             message += String.valueOf(13*12-gridCount) + " missing detectors";
                                         } else {
                                             for (Map.Entry<Integer, Set<Integer>> e : missingBandIds.entrySet()) {
-                                                message += "band " + String.valueOf(e.getKey()) + " [detectors: " + join(e.getValue(), ",") + "]; ";
-                                                /*for (Integer d : e.getValue()) {
+                                                message += "band " + String.valueOf(e.getKey()) + " [detectors: " + Utilities.join(e.getValue(), ",") + "]; ";
+                                                *//*for (Integer d : e.getValue()) {
                                                     message += Integer.valueOf(d) + ",";
                                                 }
-                                                message = message.substring(0, message.length() - 1) + "];";*/
+                                                message = message.substring(0, message.length() - 1) + "];";*//*
                                             }
                                         }
                                         String[] tokens = lines.toString().split("\n");
@@ -292,11 +295,12 @@ public class ProductDownloader {
                                             Logger.info(message);
                                         }
                                     }
-                                }
+                                }*/
+                                List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
                                 for (String bandFileName : bandFiles) {
                                     downloadFile(pathBuilder.root(tileUrl).node("IMG_DATA").node(refName + NAME_SEPARATOR + bandFileName).value(), imgData.resolve(refName + NAME_SEPARATOR + bandFileName));
                                 }
-                                List<String> lines = filter(tileMetadataLines, "<MASK_FILENAME");
+                                List<String> lines = Utilities.filter(tileMetadataLines, "<MASK_FILENAME");
                                 for (String line : lines) {
                                     line = line.trim();
                                     int firstTagCloseIdx = line.indexOf(">") + 1;
@@ -304,7 +308,7 @@ public class ProductDownloader {
                                     String maskFileName = line.substring(firstTagCloseIdx, secondTagBeginIdx);
                                     downloadFile(pathBuilder.root(tileUrl).node("QI_DATA").node(maskFileName).value(), qiData.resolve(maskFileName));
                                 }
-                                Logger.info("Tile download completed in %s", formatTime(System.currentTimeMillis() - start));
+                                Logger.info("Tile download completed in %s", Utilities.formatTime(System.currentTimeMillis() - start));
                             } else {
                                 Logger.error("File %s was not downloaded", tileMetaFile.getFileName());
                             }
@@ -361,7 +365,7 @@ public class ProductDownloader {
             Path previewFile = metadataFile.resolveSibling("preview.png");
             if (Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
-                List<String> metaTileNames = filter(allLines, "<Granules");
+                List<String> metaTileNames = Utilities.filter(allLines, "<Granules");
                 boolean hasTiles = updateMedatata(metadataFile, allLines);
                 if (hasTiles) {
                     downloadFile(baseProductUrl + "inspire.xml", inspireFile);
@@ -393,8 +397,8 @@ public class ProductDownloader {
                             String refName = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
                             String metadataName = refName.replace("MSI", "MTD");
                             Path tileMetaFile = downloadFile(tileUrl + "/metadata.xml", tileFolder.resolve(metadataName + ".xml"));
-                            List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
-                            int gridCount = filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
+                            /*List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
+                            int gridCount = Utilities.filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
                             if (gridCount != 13 * 12) {
                                 Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
                                 if (!FillAnglesMethod.NONE.equals(this.fillMissingAnglesMethod)) {
@@ -416,10 +420,10 @@ public class ProductDownloader {
                                             message += String.valueOf(13*12-gridCount) + " missing detectors";
                                         } else {
                                             for (Map.Entry<Integer, Set<Integer>> e : missingBandIds.entrySet()) {
-                                                message += "band " + String.valueOf(e.getKey()) + " [detectors: " + join(e.getValue(), ",") + "]; ";
-                                                /*for (Integer d : e.getValue()) {
+                                                message += "band " + String.valueOf(e.getKey()) + " [detectors: " + Utilities.join(e.getValue(), ",") + "]; ";
+                                                *//*for (Integer d : e.getValue()) {
                                                     message += Integer.valueOf(d) + ",";
-                                                }*/
+                                                }*//*
                                                 //message = message.substring(0, message.length() - 1) + "]; ";
                                             }
                                         }
@@ -433,7 +437,8 @@ public class ProductDownloader {
                                         Logger.error(e.getMessage());
                                     }
                                 }
-                            }
+                            }*/
+                            List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
                             for (String bandFileName : bandFiles) {
                                 try {
                                     downloadFile(tileUrl + URL_SEPARATOR + bandFileName, imgData.resolve(refName + NAME_SEPARATOR + bandFileName));
@@ -441,7 +446,7 @@ public class ProductDownloader {
                                     Logger.warn("Download failed: " + bandFileName);
                                 }
                             }
-                            List<String> lines = filter(tileMetadataLines, "<MASK_FILENAME");
+                            List<String> lines = Utilities.filter(tileMetadataLines, "<MASK_FILENAME");
                             for (String line : lines) {
                                 line = line.trim();
                                 int firstTagCloseIdx = line.indexOf(">") + 1;
@@ -517,7 +522,7 @@ public class ProductDownloader {
             String tileId = tokens[1] + tokens[2] + tokens[3];
             if (!shouldFilterTiles || (filteredTiles.size() == 0 || filteredTiles.contains(tileId))) {
                 tileId = "T" + tileId;
-                String tileName = find(metaTileNames, tileId);
+                String tileName = Utilities.find(metaTileNames, tileId);
                 if (tileName == null) {
                     tileName = tilePrefix + dataTakeTokens[1] + "_A" + dataTakeTokens[2] + NAME_SEPARATOR + tileId + NAME_SEPARATOR + dataTakeTokens[3];
                 }
@@ -584,120 +589,26 @@ public class ProductDownloader {
     }
 
     private Path ensureExists(Path folder) throws IOException {
-        if (!Files.exists(folder))
-            folder = Files.createDirectory(folder);
+        if (!Files.exists(folder)) {
+            boolean supportsPosix = false;
+            FileSystem fileSystem = FileSystems.getDefault();
+            Iterable<FileStore> fileStores = fileSystem.getFileStores();
+            for (FileStore fs : fileStores) {
+                supportsPosix = fs.supportsFileAttributeView(PosixFileAttributeView.class);
+                if (supportsPosix) {
+                    break;
+                }
+            }
+            if (supportsPosix) {
+                Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rw-rw-rw-");
+                FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(perms);
+                folder = Files.createDirectory(folder, attrs);
+            } else {
+                folder = Files.createDirectory(folder);
+            }
+
+        }
         return folder;
-    }
-
-    private List<String> filter(List<String> input, String filter) {
-        List<String> result = new ArrayList<>();
-        if (input != null) {
-            for (String item : input) {
-                if (item.contains(filter)) {
-                    result.add(item);
-                }
-            }
-        }
-        return result;
-    }
-
-    private String find(List<String> input, String filter) {
-        String value = null;
-        String granuleName;
-        for (String line : input) {
-            granuleName = getAttributeValue(line, "granuleIdentifier");
-            if (granuleName.contains(filter)) {
-                value = granuleName;
-                break;
-            }
-        }
-        return value;
-    }
-
-    private String formatTime(long millis) {
-        return String.format("%02dh:%02dm:%02ds",
-                TimeUnit.MILLISECONDS.toHours(millis),
-                TimeUnit.MILLISECONDS.toMinutes(millis) % TimeUnit.HOURS.toMinutes(1),
-                TimeUnit.MILLISECONDS.toSeconds(millis) % TimeUnit.MINUTES.toSeconds(1));
-    }
-
-    private String getAttributeValue(String xmlLine, String name) {
-        String value = null;
-        int idx = xmlLine.indexOf(name);
-        if (idx > 0) {
-            int start = idx + name.length() + 2;
-            value = xmlLine.substring(start, xmlLine.indexOf("\"", start));
-        }
-        return value;
-    }
-
-    private List<ViewingIncidenceAngleGrid> computeMissingAngles(Map<String, MetaGrid> angleGridMap) {
-        MetaGrid zeniths = angleGridMap.get("Zenith");
-        MetaGrid azimuths = angleGridMap.get("Azimuth");
-        zeniths.setFillMethod(this.fillMissingAnglesMethod);
-        azimuths.setFillMethod(this.fillMissingAnglesMethod);
-        List<ViewingIncidenceAngleGrid> computedGrids = new ArrayList<>();
-        Set<Integer[]> missingPairs = zeniths.fillGaps();
-        azimuths.fillGaps();
-        for (Integer[] pair : missingPairs) {
-            int bandId = pair[0];
-            int detectorId = pair[1];
-            ViewingIncidenceAngleGrid grid = new ViewingIncidenceAngleGrid(bandId, detectorId - 1);
-            grid.setZenith(zeniths.getGrid(bandId, detectorId));
-            grid.setAzimuth(azimuths.getGrid(bandId, detectorId));
-            computedGrids.add(grid);
-        }
-
-        return computedGrids;
-    }
-
-    private Map<Integer, Double> computeMeanAngles(Map<String, MetaGrid> angleGridMap, List<ViewingIncidenceAngleGrid> missingGrids, boolean isZenith) {
-        Map<Integer, Double> means = new HashMap<>();
-        Map<Integer, Integer> nonNaNCounts = new HashMap<>();
-        Map<Integer, MeanBandAngle> bandMeanAngles = angleGridMap.get("Zenith").getBandMeanAngles();
-        for (ViewingIncidenceAngleGrid grid : missingGrids) {
-            int bandId = grid.getBandId();
-            if (!bandMeanAngles.containsKey(bandId)) {
-                double meanValue = (isZenith ? grid.getZenith() : grid.getAzimuth()).meanValue();
-                if (!Double.isNaN(meanValue)) {
-                    if (!means.containsKey(bandId)) {
-                        means.put(bandId, meanValue);
-                    } else {
-                        means.put(bandId, means.get(bandId) + meanValue);
-                    }
-
-                    if (!nonNaNCounts.containsKey(bandId)) {
-                        nonNaNCounts.put(bandId, 1);
-                    } else {
-                        nonNaNCounts.put(bandId, nonNaNCounts.get(bandId) + 1);
-                    }
-                }
-            }
-        }
-        for (Integer bandId : means.keySet()) {
-            means.put(bandId, means.containsKey(bandId) ?
-                                (means.get(bandId) / (double) (nonNaNCounts.containsKey(bandId) ? nonNaNCounts.get(bandId) : 1)) :
-                                Double.NaN);
-        }
-
-        return means;
-    }
-
-    private List<String> meansToXml(Map<Integer, Double> zenithMeans, Map<Integer, Double> azimuthMeans) {
-        StringBuilder buffer = new StringBuilder();
-        if(zenithMeans.size() == azimuthMeans.size() && zenithMeans.size() > 0) {
-            for (Integer bandId : zenithMeans.keySet()) {
-                buffer.append(Constants.LEVEL_2).append("<Mean_Viewing_Incidence_Angle bandId=\"").append(bandId).append("\">\n");
-                buffer.append(Constants.LEVEL_3).append("<ZENITH_ANGLE unit=\"deg\">").append(zenithMeans.get(bandId)).append("</ZENITH_ANGLE>\n");
-                buffer.append(Constants.LEVEL_3).append("<AZIMUTH_ANGLE unit=\"deg\">").append(azimuthMeans.containsKey(bandId)?(Serializable)azimuthMeans.get(bandId):"NaN").append("</AZIMUTH_ANGLE>\n");
-                buffer.append(Constants.LEVEL_2).append("</Mean_Viewing_Incidence_Angle>\n");
-            }
-            Logger.info("Mean angles have been computed for bands " + join(zenithMeans.keySet(), ","));
-        }
-        if (zenithMeans.size() == 0) {
-            Logger.info("No mean angle has been computed");
-        }
-        return Arrays.asList(buffer.toString().split("\n"));
     }
 
     private boolean updateMedatata(Path metaFile, List<String> originalLines) throws IOException {
@@ -722,48 +633,6 @@ public class ProductDownloader {
             }
         }
         return canProceed;
-    }
-
-    private boolean insertAngles(Path metaFile, List<String> originalLines, List<String> gridLines, List<String> meanLines) throws IOException {
-        boolean gridUpdated = false;
-        boolean meansUpdated = meanLines.isEmpty();
-        int lineCount = originalLines.size();
-
-        for(int idx = 0; idx < lineCount; ++idx) {
-            String line = originalLines.get(idx);
-            if(line.contains("<Viewing_Incidence_Angles_Grids") && !gridUpdated) {
-                gridUpdated = originalLines.addAll(idx, gridLines);
-                idx += gridLines.size();
-                lineCount += gridLines.size();
-            }
-
-            if(line.contains("<Mean_Viewing_Incidence_Angle ") && !meansUpdated) {
-                meansUpdated = originalLines.addAll(idx, meanLines);
-                idx = lineCount;
-            }
-        }
-
-        if(gridUpdated && meansUpdated) {
-            Files.copy(metaFile, Paths.get(metaFile.toAbsolutePath().toString() + ".bkp"));
-            Files.write(metaFile, originalLines, StandardCharsets.UTF_8);
-        }
-
-        return gridUpdated && meansUpdated;
-    }
-
-    private String join(Iterable collection, String separator) {
-        String result = "";
-        if (collection != null) {
-            boolean hasElements = false;
-            for (Object aCollection : collection) {
-                hasElements = true;
-                result += (aCollection != null ? aCollection.toString() : "null") + separator;
-            }
-            if (hasElements) {
-                result = result.substring(0, result.length() - separator.length());
-            }
-        }
-        return result;
     }
 
     private class ODataPath {

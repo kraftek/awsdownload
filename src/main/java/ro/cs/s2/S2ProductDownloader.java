@@ -5,6 +5,7 @@ import ro.cs.s2.util.Constants;
 import ro.cs.s2.util.Logger;
 import ro.cs.s2.util.NetUtils;
 import ro.cs.s2.workaround.FillAnglesMethod;
+import ro.cs.s2.workaround.ProductInspector;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -28,13 +29,24 @@ public class S2ProductDownloader {
     static {
         options = new Options();
 
-        options.addOption(Option.builder(Constants.PARAM_OUT_FOLDER)
+        Option outFolder = Option.builder(Constants.PARAM_OUT_FOLDER)
                 .longOpt("out")
                 .argName("output.folder")
                 .desc("The folder in which the products will be downloaded")
                 .hasArg()
                 .required()
-                .build());
+                .build();
+        Option inFolder = Option.builder(Constants.PARAM_INPUT_FOLDER)
+                .longOpt("input")
+                .argName("input.folder")
+                .desc("The folder in which the products are to be inspected")
+                .hasArg()
+                .required()
+                .build();
+        OptionGroup folderGroup = new OptionGroup();
+        folderGroup.addOption(outFolder);
+        folderGroup.addOption(inFolder);
+        options.addOptionGroup(folderGroup);
 
         Option optionArea = Option.builder(Constants.PARAM_AREA)
                 .longOpt("area")
@@ -110,14 +122,14 @@ public class S2ProductDownloader {
                 .argName("user")
                 .desc("User account to connect to SCIHUB")
                 .hasArg(true)
-                .required()
+                .required(false)
                 .build());
         options.addOption(Option.builder(Constants.PARAM_PASSWORD)
                 .longOpt("password")
                 .argName("password")
                 .desc("Password to connect to SCIHUB")
                 .hasArg(true)
-                .required()
+                .required(false)
                 .build());
 
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
@@ -244,146 +256,165 @@ public class S2ProductDownloader {
             formatter.printHelp("S2ProductDownload", options);
             System.exit(0);
         }
+        boolean succeeded = true;
         CommandLineParser parser = new DefaultParser();
         CommandLine commandLine = parser.parse(options, args);
-        List<ProductDescriptor> products = new ArrayList<>();
-        Set<String> tiles = new HashSet<>();
-        Polygon2D areaOfInterest = new Polygon2D();
-        ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE, ProductStore.SCIHUB.toString()));
 
-        String proxyType = commandLine.hasOption(Constants.PARAM_PROXY_TYPE) ?
-                commandLine.getOptionValue(Constants.PARAM_PROXY_TYPE) :
-                nullIfEmpty(props.getProperty("proxy.type", null));
-        String proxyHost = commandLine.hasOption(Constants.PARAM_PROXY_HOST) ?
-                commandLine.getOptionValue(Constants.PARAM_PROXY_HOST) :
-                nullIfEmpty(props.getProperty("proxy.host", null));
-        String proxyPort = commandLine.hasOption(Constants.PARAM_PROXY_PORT) ?
-                commandLine.getOptionValue(Constants.PARAM_PROXY_PORT) :
-                nullIfEmpty(props.getProperty("proxy.port", null));
-        String proxyUser = commandLine.hasOption(Constants.PARAM_PROXY_USER) ?
-                commandLine.getOptionValue(Constants.PARAM_PROXY_USER) :
-                nullIfEmpty(props.getProperty("proxy.user", null));
-        String proxyPwd = commandLine.hasOption(Constants.PARAM_PROXY_PASSWORD) ?
-                commandLine.getOptionValue(Constants.PARAM_PROXY_PASSWORD) :
-                nullIfEmpty(props.getProperty("proxy.pwd", null));
-        NetUtils.setProxy(proxyType, proxyHost, proxyPort == null ? 0 : Integer.parseInt(proxyPort), proxyUser, proxyPwd);
-
-        String user = commandLine.getOptionValue(Constants.PARAM_USER);
-        String pwd = commandLine.getOptionValue(Constants.PARAM_PASSWORD);
-        if (!user.isEmpty() && !pwd.isEmpty()) {
-            String authToken = "Basic " + new String(Base64.getEncoder().encode((user + ":" + pwd).getBytes()));
-            NetUtils.setAuthToken(authToken);
-        }
-
-        ProductDownloader downloader = new ProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER));
-
-        if (commandLine.hasOption(Constants.PARAM_AREA)) {
-            String[] points = commandLine.getOptionValues(Constants.PARAM_AREA);
-            for (String point : points) {
-                areaOfInterest.append(Double.parseDouble(point.substring(0, point.indexOf(","))),
-                                      Double.parseDouble(point.substring(point.indexOf(",") + 1)));
-            }
-        } else if (commandLine.hasOption(Constants.PARAM_AREA_FILE)) {
-            areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue(Constants.PARAM_AREA_FILE))), StandardCharsets.UTF_8));
-        }
-
-        if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
-            Collections.addAll(tiles, commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
-        } else if (commandLine.hasOption(Constants.PARAM_TILE_LIST_FILE)) {
-            tiles.addAll(Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_TILE_LIST_FILE))));
-        }
-
-        if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST)) {
-            String[] uuids = commandLine.getOptionValues(Constants.PARAM_PRODUCT_UUID_LIST);
-            String[] productNames = commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST);
-            if ((!commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE) || ProductStore.SCIHUB.toString().equals(commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE))) &&
-                    (uuids == null || uuids.length != productNames.length)) {
-                System.err.println("For the list of product names a corresponding list of UUIDs has to be given!");
-                System.exit(-1);
-            }
-            for (int i = 0; i  < productNames.length; i++) {
-                ProductDescriptor productDescriptor = new ProductDescriptor(productNames[i]);
-                if (uuids != null) {
-                    productDescriptor.setId(uuids[i]);
-                }
-                products.add(productDescriptor);
-            }
-        } else if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST_FILE)) {
-            for (String line : Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_PRODUCT_LIST_FILE)))) {
-                products.add(new ProductDescriptor(line));
-            }
-        }
-
-        double clouds;
-        if (commandLine.hasOption(Constants.PARAM_CLOUD_PERCENTAGE)) {
-            clouds = Double.parseDouble(commandLine.getOptionValue(Constants.PARAM_CLOUD_PERCENTAGE));
-        } else {
-            clouds = Constants.DEFAULT_CLOUD_PERCENTAGE;
-        }
-        String sensingStart;
-        if (commandLine.hasOption(Constants.PARAM_START_DATE)) {
-            String dateString = commandLine.getOptionValue(Constants.PARAM_START_DATE);
-            LocalDate startDate = LocalDate.parse(dateString, DateTimeFormatter.ISO_DATE);
-            long days = ChronoUnit.DAYS.between(startDate, LocalDate.now());
-            sensingStart = String.format(Constants.PATTERN_START_DATE, days);
-        } else {
-            sensingStart = Constants.DEFAULT_START_DATE;
-        }
-
-        String sensingEnd;
-        if (commandLine.hasOption(Constants.PARAM_END_DATE)) {
-            String dateString = commandLine.getOptionValue(Constants.PARAM_END_DATE);
-            LocalDate endDate = LocalDate.parse(dateString, DateTimeFormatter.ISO_DATE);
-            long days = ChronoUnit.DAYS.between(endDate, LocalDate.now());
-            sensingEnd = String.format(Constants.PATTERN_START_DATE, days);
-        } else {
-            sensingEnd = Constants.DEFAULT_END_DATE;
-        }
-
-        int limit;
-        if (commandLine.hasOption(Constants.PARAM_RESULTS_LIMIT)) {
-            limit = Integer.parseInt(commandLine.getOptionValue(Constants.PARAM_RESULTS_LIMIT));
-        } else {
-            limit = Constants.DEFAULT_RESULTS_LIMIT;
-        }
-
-        if (commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE)) {
-            String value = commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE);
-            downloader.setDownloadStore(Enum.valueOf(ProductStore.class, value));
-            Logger.info("Products will be downloaded from %s", value);
-        }
-
-        downloader.shouldCompress(commandLine.hasOption(Constants.PARAM_FLAG_COMPRESS));
-        downloader.shouldDeleteAfterCompression(commandLine.hasOption(Constants.PARAM_FLAG_DELETE));
-        if (commandLine.hasOption(Constants.PARAM_FILL_ANGLES)) {
-            downloader.setFillMissingAnglesMethod(Enum.valueOf(FillAnglesMethod.class,
+        if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
+            String rootFolder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
+            FillAnglesMethod fillAnglesMethod = Enum.valueOf(FillAnglesMethod.class,
                     commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
                             commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase() :
-                            FillAnglesMethod.NONE.name()));
-        }
+                            FillAnglesMethod.NONE.name());
+            if (!FillAnglesMethod.NONE.equals(fillAnglesMethod)) {
+                try {
+                    ProductInspector inspector = new ProductInspector(rootFolder, fillAnglesMethod);
+                    inspector.traverse();
+                } catch (IOException e) {
+                    Logger.error(e.getMessage());
+                    succeeded = false;
+                }
+            }
+        } else {
+            List<ProductDescriptor> products = new ArrayList<>();
+            Set<String> tiles = new HashSet<>();
+            Polygon2D areaOfInterest = new Polygon2D();
+            ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE, ProductStore.SCIHUB.toString()));
 
-        int numPoints = areaOfInterest.getNumPoints();
-        if (numPoints > 0) {
-            String searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
-            if (!NetUtils.isAvailable(searchUrl)) {
-                Logger.error(searchUrl + " is not available!");
-                searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
-            }
-            ProductSearch search = new ProductSearch(searchUrl);
-            search.setPolygon(areaOfInterest);
-            search.setClouds(clouds);
+            String proxyType = commandLine.hasOption(Constants.PARAM_PROXY_TYPE) ?
+                    commandLine.getOptionValue(Constants.PARAM_PROXY_TYPE) :
+                    nullIfEmpty(props.getProperty("proxy.type", null));
+            String proxyHost = commandLine.hasOption(Constants.PARAM_PROXY_HOST) ?
+                    commandLine.getOptionValue(Constants.PARAM_PROXY_HOST) :
+                    nullIfEmpty(props.getProperty("proxy.host", null));
+            String proxyPort = commandLine.hasOption(Constants.PARAM_PROXY_PORT) ?
+                    commandLine.getOptionValue(Constants.PARAM_PROXY_PORT) :
+                    nullIfEmpty(props.getProperty("proxy.port", null));
+            String proxyUser = commandLine.hasOption(Constants.PARAM_PROXY_USER) ?
+                    commandLine.getOptionValue(Constants.PARAM_PROXY_USER) :
+                    nullIfEmpty(props.getProperty("proxy.user", null));
+            String proxyPwd = commandLine.hasOption(Constants.PARAM_PROXY_PASSWORD) ?
+                    commandLine.getOptionValue(Constants.PARAM_PROXY_PASSWORD) :
+                    nullIfEmpty(props.getProperty("proxy.pwd", null));
+            NetUtils.setProxy(proxyType, proxyHost, proxyPort == null ? 0 : Integer.parseInt(proxyPort), proxyUser, proxyPwd);
+
+            String user = commandLine.getOptionValue(Constants.PARAM_USER);
+            String pwd = commandLine.getOptionValue(Constants.PARAM_PASSWORD);
             if (!user.isEmpty() && !pwd.isEmpty()) {
-                search = search.auth(user, pwd);
+                String authToken = "Basic " + new String(Base64.getEncoder().encode((user + ":" + pwd).getBytes()));
+                NetUtils.setAuthToken(authToken);
             }
-            String interval = "[" + sensingStart + " TO " + sensingEnd + "]";
-            search.filter(Constants.SEARCH_PARAM_INTERVAL, interval).limit(limit);
-            if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
-                search.filter(Constants.SEARCH_PARAM_RELATIVE_ORBIT_NUMBER, commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT));
+
+            ProductDownloader downloader = new ProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER));
+
+            if (commandLine.hasOption(Constants.PARAM_AREA)) {
+                String[] points = commandLine.getOptionValues(Constants.PARAM_AREA);
+                for (String point : points) {
+                    areaOfInterest.append(Double.parseDouble(point.substring(0, point.indexOf(","))),
+                            Double.parseDouble(point.substring(point.indexOf(",") + 1)));
+                }
+            } else if (commandLine.hasOption(Constants.PARAM_AREA_FILE)) {
+                areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue(Constants.PARAM_AREA_FILE))), StandardCharsets.UTF_8));
             }
-            products = search.execute();
+
+            if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
+                Collections.addAll(tiles, commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
+            } else if (commandLine.hasOption(Constants.PARAM_TILE_LIST_FILE)) {
+                tiles.addAll(Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_TILE_LIST_FILE))));
+            }
+
+            if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST)) {
+                String[] uuids = commandLine.getOptionValues(Constants.PARAM_PRODUCT_UUID_LIST);
+                String[] productNames = commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST);
+                if ((!commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE) || ProductStore.SCIHUB.toString().equals(commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE))) &&
+                        (uuids == null || uuids.length != productNames.length)) {
+                    System.err.println("For the list of product names a corresponding list of UUIDs has to be given!");
+                    System.exit(-1);
+                }
+                for (int i = 0; i < productNames.length; i++) {
+                    ProductDescriptor productDescriptor = new ProductDescriptor(productNames[i]);
+                    if (uuids != null) {
+                        productDescriptor.setId(uuids[i]);
+                    }
+                    products.add(productDescriptor);
+                }
+            } else if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST_FILE)) {
+                for (String line : Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_PRODUCT_LIST_FILE)))) {
+                    products.add(new ProductDescriptor(line));
+                }
+            }
+
+            double clouds;
+            if (commandLine.hasOption(Constants.PARAM_CLOUD_PERCENTAGE)) {
+                clouds = Double.parseDouble(commandLine.getOptionValue(Constants.PARAM_CLOUD_PERCENTAGE));
+            } else {
+                clouds = Constants.DEFAULT_CLOUD_PERCENTAGE;
+            }
+            String sensingStart;
+            if (commandLine.hasOption(Constants.PARAM_START_DATE)) {
+                String dateString = commandLine.getOptionValue(Constants.PARAM_START_DATE);
+                LocalDate startDate = LocalDate.parse(dateString, DateTimeFormatter.ISO_DATE);
+                long days = ChronoUnit.DAYS.between(startDate, LocalDate.now());
+                sensingStart = String.format(Constants.PATTERN_START_DATE, days);
+            } else {
+                sensingStart = Constants.DEFAULT_START_DATE;
+            }
+
+            String sensingEnd;
+            if (commandLine.hasOption(Constants.PARAM_END_DATE)) {
+                String dateString = commandLine.getOptionValue(Constants.PARAM_END_DATE);
+                LocalDate endDate = LocalDate.parse(dateString, DateTimeFormatter.ISO_DATE);
+                long days = ChronoUnit.DAYS.between(endDate, LocalDate.now());
+                sensingEnd = String.format(Constants.PATTERN_START_DATE, days);
+            } else {
+                sensingEnd = Constants.DEFAULT_END_DATE;
+            }
+
+            int limit;
+            if (commandLine.hasOption(Constants.PARAM_RESULTS_LIMIT)) {
+                limit = Integer.parseInt(commandLine.getOptionValue(Constants.PARAM_RESULTS_LIMIT));
+            } else {
+                limit = Constants.DEFAULT_RESULTS_LIMIT;
+            }
+
+            if (commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE)) {
+                String value = commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE);
+                downloader.setDownloadStore(Enum.valueOf(ProductStore.class, value));
+                Logger.info("Products will be downloaded from %s", value);
+            }
+
+            downloader.shouldCompress(commandLine.hasOption(Constants.PARAM_FLAG_COMPRESS));
+            downloader.shouldDeleteAfterCompression(commandLine.hasOption(Constants.PARAM_FLAG_DELETE));
+            if (commandLine.hasOption(Constants.PARAM_FILL_ANGLES)) {
+                downloader.setFillMissingAnglesMethod(Enum.valueOf(FillAnglesMethod.class,
+                        commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
+                                commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase() :
+                                FillAnglesMethod.NONE.name()));
+            }
+
+            int numPoints = areaOfInterest.getNumPoints();
+            if (numPoints > 0) {
+                String searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
+                if (!NetUtils.isAvailable(searchUrl)) {
+                    Logger.error(searchUrl + " is not available!");
+                    searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
+                }
+                ProductSearch search = new ProductSearch(searchUrl);
+                search.setPolygon(areaOfInterest);
+                search.setClouds(clouds);
+                if (!user.isEmpty() && !pwd.isEmpty()) {
+                    search = search.auth(user, pwd);
+                }
+                String interval = "[" + sensingStart + " TO " + sensingEnd + "]";
+                search.filter(Constants.SEARCH_PARAM_INTERVAL, interval).limit(limit);
+                if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
+                    search.filter(Constants.SEARCH_PARAM_RELATIVE_ORBIT_NUMBER, commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT));
+                }
+                products = search.execute();
+            }
+            downloader.setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
+            succeeded = downloader.downloadProducts(products);
         }
-        downloader.setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
-        boolean succeeded = downloader.downloadProducts(products);
         System.exit(succeeded ? 0 : -1);
     }
 
