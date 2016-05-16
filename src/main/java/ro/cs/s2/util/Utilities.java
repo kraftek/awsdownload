@@ -1,7 +1,14 @@
 package ro.cs.s2.util;
 
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -65,5 +72,28 @@ public class Utilities {
             value = xmlLine.substring(start, xmlLine.indexOf("\"", start));
         }
         return value;
+    }
+
+    public static Path ensureExists(Path folder) throws IOException {
+        if (folder != null && !Files.exists(folder)) {
+            boolean supportsPosix = false;
+            FileSystem fileSystem = FileSystems.getDefault();
+            Iterable<FileStore> fileStores = fileSystem.getFileStores();
+            for (FileStore fs : fileStores) {
+                supportsPosix = fs.supportsFileAttributeView(PosixFileAttributeView.class);
+                if (supportsPosix) {
+                    break;
+                }
+            }
+            if (supportsPosix) {
+                Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
+                FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(perms);
+                folder = Files.createDirectory(folder, attrs);
+            } else {
+                folder = Files.createDirectory(folder);
+            }
+
+        }
+        return folder;
     }
 }

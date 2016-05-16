@@ -57,7 +57,7 @@ public class ProductInspector {
                                 }
                                 Files.write(file, originalLines, StandardCharsets.UTF_8);
                             } else {
-                                Logger.info(String.format("%s already processed", fileName));
+                                Logger.getRootLogger().info(String.format("%s already processed", fileName));
                             }
                             return FileVisitResult.SKIP_SIBLINGS;
                         }

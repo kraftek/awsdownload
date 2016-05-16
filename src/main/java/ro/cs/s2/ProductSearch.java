@@ -81,7 +81,7 @@ public class ProductSearch {
             filter("footprint", "\"Intersects(" + (polygon.getNumPoints() < 200 ? polygon.toWKT() : polygon.toWKTBounds()) + ")\"");
         }
         String queryUrl = getQuery();
-        Logger.info(queryUrl);
+        Logger.getRootLogger().info(queryUrl);
         try (CloseableHttpResponse response = NetUtils.openConnection(queryUrl, credentials)) {
             switch (response.getStatusLine().getStatusCode()) {
                 case 200:
@@ -97,7 +97,7 @@ public class ProductSearch {
                                 if (cloudFilter == 0 || cloudsPercentage <= cloudFilter) {
                                     results.add(currentProduct);
                                 } else {
-                                    Logger.info("%s skipped [clouds: %s]", currentProduct, cloudsPercentage);
+                                    Logger.getRootLogger().info("%s skipped [clouds: %s]", currentProduct, cloudsPercentage);
                                 }
                             }
                         } else if (string.contains("<title>")) {
@@ -117,14 +117,14 @@ public class ProductSearch {
                     }
                     break;
                 case 401:
-                    Logger.info("The supplied credentials are invalid!");
+                    Logger.getRootLogger().info("The supplied credentials are invalid!");
                     break;
                 default:
-                    Logger.info("The request was not successful. Reason: %s", response.getStatusLine().getReasonPhrase());
+                    Logger.getRootLogger().info("The request was not successful. Reason: %s", response.getStatusLine().getReasonPhrase());
                     break;
             }
         }
-        Logger.info("Query returned %s products", results.size());
+        Logger.getRootLogger().info("Query returned %s products", results.size());
         return results;
     }
 

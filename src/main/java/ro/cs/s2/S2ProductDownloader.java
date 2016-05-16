@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -259,7 +260,10 @@ public class S2ProductDownloader {
         boolean succeeded = true;
         CommandLineParser parser = new DefaultParser();
         CommandLine commandLine = parser.parse(options, args);
-
+        String logFile = props.getProperty("master.log.file");
+        Path jarPath = Paths.get(S2ProductDownloader.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        String folder = jarPath.getParent().toAbsolutePath().toString();
+        Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString());
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
             String rootFolder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             FillAnglesMethod fillAnglesMethod = Enum.valueOf(FillAnglesMethod.class,
@@ -271,7 +275,7 @@ public class S2ProductDownloader {
                     ProductInspector inspector = new ProductInspector(rootFolder, fillAnglesMethod);
                     inspector.traverse();
                 } catch (IOException e) {
-                    Logger.error(e.getMessage());
+                    Logger.getRootLogger().error(e.getMessage());
                     succeeded = false;
                 }
             }
@@ -380,7 +384,7 @@ public class S2ProductDownloader {
             if (commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE)) {
                 String value = commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE);
                 downloader.setDownloadStore(Enum.valueOf(ProductStore.class, value));
-                Logger.info("Products will be downloaded from %s", value);
+                Logger.getRootLogger().info("Products will be downloaded from %s", value);
             }
 
             downloader.shouldCompress(commandLine.hasOption(Constants.PARAM_FLAG_COMPRESS));
@@ -396,7 +400,7 @@ public class S2ProductDownloader {
             if (numPoints > 0) {
                 String searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
                 if (!NetUtils.isAvailable(searchUrl)) {
-                    Logger.error(searchUrl + " is not available!");
+                    Logger.getRootLogger().error(searchUrl + " is not available!");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
                 }
                 ProductSearch search = new ProductSearch(searchUrl);

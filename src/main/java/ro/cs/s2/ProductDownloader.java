@@ -15,12 +15,9 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.nio.file.FileSystem;
-import java.nio.file.attribute.FileAttribute;
-import java.nio.file.attribute.PosixFileAttributeView;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -77,6 +74,8 @@ public class ProductDownloader {
 
     private ProductStore store;
 
+    private Logger.ScopeLogger productLogger;
+
     public ProductDownloader(ProductStore source, String targetFolder) {
         this.store = source;
         this.destination = targetFolder;
@@ -84,7 +83,7 @@ public class ProductDownloader {
         try {
             props.load(getClass().getResourceAsStream("download.properties"));
         } catch (IOException e) {
-            Logger.error("Cannot load properties file. Reason: %s", e.getMessage());
+            getLogger().error("Cannot load properties file. Reason: %s", e.getMessage());
         }
         zipsUrl = props.getProperty("s2.aws.products.url", "http://sentinel-s2-l1c.s3.amazonaws.com");
         if (!zipsUrl.endsWith("/"))
@@ -147,21 +146,32 @@ public class ProductDownloader {
         if (products != null) {
             int productCounter = 1, productCount = products.size();
             for (ProductDescriptor product : products) {
-                currentProduct = "Product " + String.valueOf(productCounter++) + "/" + String.valueOf(productCount);
                 long startTime = System.currentTimeMillis();
                 Path file = null;
+                currentProduct = "Product " + String.valueOf(productCounter++) + "/" + String.valueOf(productCount);
                 try {
+                    Utilities.ensureExists(Paths.get(destination));
                     file = download(product);
                     if (file == null) {
-                        Logger.warn("Product download aborted");
+                        getLogger().warn("Product download aborted");
                     }
                 } catch (IOException ignored) {
-                    Logger.warn("IO Exception: " + ignored.getMessage());
-                    Logger.warn("Product download failed");
+                    getLogger().warn("IO Exception: " + ignored.getMessage());
+                    getLogger().warn("Product download failed");
+                } finally {
+                    if (productLogger != null) {
+                        try {
+                            productLogger.close();
+                        } catch (IOException e) {
+                            getLogger().error(e.getMessage());
+                        } finally {
+                            productLogger = null;
+                        }
+                    }
                 }
                 long millis = System.currentTimeMillis() - startTime;
                 if (file != null && Files.exists(file)) {
-                    Logger.info("Product download completed in %s", Utilities.formatTime(millis));
+                    getLogger().info("Product download completed in %s", Utilities.formatTime(millis));
                 } else {
                     failedProducts++;
                 }
@@ -199,7 +209,7 @@ public class ProductDownloader {
     private Path downloadFromSciHub(ProductDescriptor product) throws IOException {
         Path rootPath = null;
         String url;
-        ensureExists(Paths.get(destination));
+        Utilities.ensureExists(Paths.get(destination));
         String productName = product.getName();
         if (!shouldFilterTiles) {
             currentStep = "Archive";
@@ -208,7 +218,7 @@ public class ProductDownloader {
             rootPath = downloadFile(url, rootPath);
         }
         if (rootPath == null || !Files.exists(rootPath)) {
-            rootPath = ensureExists(Paths.get(destination, productName + ".SAFE"));
+            rootPath = Utilities.ensureExists(Paths.get(destination, productName + ".SAFE"));
             url = getMetadataUrl(product);
             Path metadataFile = rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
             currentStep = "Metadata";
@@ -218,9 +228,9 @@ public class ProductDownloader {
                 List<String> metaTileNames = Utilities.filter(allLines, "<Granules");
                 boolean hasTiles = updateMedatata(metadataFile, allLines);
                 if (hasTiles) {
-                    Path tilesFolder = ensureExists(rootPath.resolve("GRANULE"));
-                    ensureExists(rootPath.resolve("AUX_DATA"));
-                    Path dataStripFolder = ensureExists(rootPath.resolve("DATASTRIP"));
+                    Path tilesFolder = Utilities.ensureExists(rootPath.resolve("GRANULE"));
+                    Utilities.ensureExists(rootPath.resolve("AUX_DATA"));
+                    Path dataStripFolder = Utilities.ensureExists(rootPath.resolve("DATASTRIP"));
                     Map<String, String> tileNames = new HashMap<>();
                     String dataStripId = null;
                     String skippedTiles = "";
@@ -240,7 +250,7 @@ public class ProductDownloader {
                         }
                     }
                     if (skippedTiles.trim().length() > 0) {
-                        Logger.info("Skipped tiles: %s",skippedTiles);
+                        getLogger().info("Skipped tiles: %s",skippedTiles);
                     }
                     String count = String.valueOf(tileNames.size());
                     int tileCounter = 1;
@@ -250,52 +260,15 @@ public class ProductDownloader {
                         currentStep = "Tile " + String.valueOf(tileCounter++) + "/" + count;
                         String tileUrl = entry.getValue();
                         String tileName = entry.getKey();
-                        Path tileFolder = ensureExists(tilesFolder.resolve(tileName));
-                        Path auxData = ensureExists(tileFolder.resolve("AUX_DATA"));
-                        Path imgData = ensureExists(tileFolder.resolve("IMG_DATA"));
-                        Path qiData = ensureExists(tileFolder.resolve("QI_DATA"));
+                        Path tileFolder = Utilities.ensureExists(tilesFolder.resolve(tileName));
+                        Path auxData = Utilities.ensureExists(tileFolder.resolve("AUX_DATA"));
+                        Path imgData = Utilities.ensureExists(tileFolder.resolve("IMG_DATA"));
+                        Path qiData = Utilities.ensureExists(tileFolder.resolve("QI_DATA"));
                         String refName = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
                         String metadataName = refName.replace("MSI", "MTD") + ".xml";
                         Path tileMetaFile = downloadFile(pathBuilder.root(tileUrl).node(metadataName).value(), tileFolder.resolve(metadataName));
                         if (tileMetaFile != null) {
                             if (Files.exists(tileMetaFile)) {
-                                /*List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
-                                int gridCount = Utilities.filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
-                                if (gridCount != 13 * 12) {
-                                    Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
-                                    if (!FillAnglesMethod.NONE.equals(this.fillMissingAnglesMethod)) {
-                                        Map<String, MetaGrid> angleGridMap = XmlAnglesReader.parse(metadataFile);
-                                        List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
-                                        StringBuilder lines = new StringBuilder();
-                                        String message = "Angle grids have been computed for ";
-                                        Map<Integer, Set<Integer>> missingBandIds = new TreeMap<>();
-                                        for (ViewingIncidenceAngleGrid missingGrid : missingAngles) {
-                                            lines.append(missingGrid.toString());
-                                            int bandId = missingGrid.getBandId();
-                                            if (!missingBandIds.containsKey(bandId)) {
-                                                missingBandIds.put(bandId, new TreeSet<Integer>());
-                                            }
-                                            missingBandIds.get(bandId).add(missingGrid.getDetectorId());
-                                        }
-                                        if (missingBandIds.isEmpty()) {
-                                            message += String.valueOf(13*12-gridCount) + " missing detectors";
-                                        } else {
-                                            for (Map.Entry<Integer, Set<Integer>> e : missingBandIds.entrySet()) {
-                                                message += "band " + String.valueOf(e.getKey()) + " [detectors: " + Utilities.join(e.getValue(), ",") + "]; ";
-                                                *//*for (Integer d : e.getValue()) {
-                                                    message += Integer.valueOf(d) + ",";
-                                                }
-                                                message = message.substring(0, message.length() - 1) + "];";*//*
-                                            }
-                                        }
-                                        String[] tokens = lines.toString().split("\n");
-                                        if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(angleGridMap, missingAngles, true), computeMeanAngles(angleGridMap, missingAngles, false)))) {
-                                            Logger.warn("Metadata for tile %s has not been updated!", tileName);
-                                        } else {
-                                            Logger.info(message);
-                                        }
-                                    }
-                                }*/
                                 List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
                                 for (String bandFileName : bandFiles) {
                                     downloadFile(pathBuilder.root(tileUrl).node("IMG_DATA").node(refName + NAME_SEPARATOR + bandFileName).value(), imgData.resolve(refName + NAME_SEPARATOR + bandFileName));
@@ -308,9 +281,9 @@ public class ProductDownloader {
                                     String maskFileName = line.substring(firstTagCloseIdx, secondTagBeginIdx);
                                     downloadFile(pathBuilder.root(tileUrl).node("QI_DATA").node(maskFileName).value(), qiData.resolve(maskFileName));
                                 }
-                                Logger.info("Tile download completed in %s", Utilities.formatTime(System.currentTimeMillis() - start));
+                                getLogger().info("Tile download completed in %s", Utilities.formatTime(System.currentTimeMillis() - start));
                             } else {
-                                Logger.error("File %s was not downloaded", tileMetaFile.getFileName());
+                                getLogger().error("File %s was not downloaded", tileMetaFile.getFileName());
                             }
                         }
                     }
@@ -320,22 +293,22 @@ public class ProductDownloader {
                                                           .node("DATASTRIP").node(dataStripId)
                                                           .node(dataStripId.substring(0, dataStripId.lastIndexOf("_")) + ".xml")
                                                           .value();
-                        Path dataStrip = ensureExists(dataStripFolder.resolve(dataStripId));
+                        Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(dataStripId));
                         String dataStripFile = dataStripId.substring(0, dataStripId.lastIndexOf(NAME_SEPARATOR)).replace("MSI", "MTD") + ".xml";
                         downloadFile(dataStripPath, dataStrip.resolve(dataStripFile));
                     }
                 } else {
                     Files.deleteIfExists(metadataFile);
                     Files.deleteIfExists(rootPath);
-                    Logger.warn("The product %s did not contain any tiles from the tile list", productName);
+                    getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
                 }
             } else {
-                Logger.warn("The product %s was not found in %s data bucket", productName, store);
+                getLogger().warn("The product %s was not found in %s data bucket", productName, store);
                 rootPath = null;
             }
         }
         if (rootPath != null && Files.exists(rootPath) && shouldCompress && !rootPath.endsWith(".zip")) {
-            Logger.info("Compressing product %s",product);
+            getLogger().info("Compressing product %s",product);
             Zipper.compress(rootPath, rootPath.getFileName().toString(), shouldDeleteAfterCompression);
         }
         return rootPath;
@@ -344,17 +317,18 @@ public class ProductDownloader {
     private Path downloadFromAWS(ProductDescriptor product) throws IOException {
         Path rootPath = null;
         String url;
-        ensureExists(Paths.get(destination));
         String productName = product.getName();
         if (!shouldFilterTiles) {
             currentStep = "Archive";
             url = zipsUrl + productName + ".zip";
             rootPath = Paths.get(destination, product + ".zip");
+            productLogger = new Logger.ScopeLogger(rootPath.getParent().resolve("download.log").toString());
             rootPath = downloadFile(url, rootPath);
         }
         if (rootPath == null || !Files.exists(rootPath)) {
             // let's try to assemble the product
-            rootPath = ensureExists(Paths.get(destination, productName + ".SAFE"));
+            rootPath = Utilities.ensureExists(Paths.get(destination, productName + ".SAFE"));
+            productLogger = new Logger.ScopeLogger(rootPath.resolve("download.log").toString());
             String baseProductUrl = getProductPath(productName);
             url = baseProductUrl + "metadata.xml";
             Path metadataFile = rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
@@ -371,9 +345,9 @@ public class ProductDownloader {
                     downloadFile(baseProductUrl + "inspire.xml", inspireFile);
                     downloadFile(baseProductUrl + "manifest.safe", manifestFile);
                     downloadFile(baseProductUrl + "preview.png", previewFile);
-                    Path tilesFolder = ensureExists(rootPath.resolve("GRANULE"));
-                    ensureExists(rootPath.resolve("AUX_DATA"));
-                    Path dataStripFolder = ensureExists(rootPath.resolve("DATASTRIP"));
+                    Path tilesFolder = Utilities.ensureExists(rootPath.resolve("GRANULE"));
+                    Utilities.ensureExists(rootPath.resolve("AUX_DATA"));
+                    Path dataStripFolder = Utilities.ensureExists(rootPath.resolve("DATASTRIP"));
                     String productJsonUrl = baseProductUrl + "productInfo.json";
                     URL jsonUrl = new URL(productJsonUrl);
                     InputStream inputStream = null;
@@ -390,60 +364,19 @@ public class ProductDownloader {
                             currentStep = "Tile " + String.valueOf(tileCounter++) + "/" + count;
                             String tileUrl = entry.getValue();
                             String tileName = entry.getKey();
-                            Path tileFolder = ensureExists(tilesFolder.resolve(tileName));
-                            Path auxData = ensureExists(tileFolder.resolve("AUX_DATA"));
-                            Path imgData = ensureExists(tileFolder.resolve("IMG_DATA"));
-                            Path qiData = ensureExists(tileFolder.resolve("QI_DATA"));
+                            Path tileFolder = Utilities.ensureExists(tilesFolder.resolve(tileName));
+                            Path auxData = Utilities.ensureExists(tileFolder.resolve("AUX_DATA"));
+                            Path imgData = Utilities.ensureExists(tileFolder.resolve("IMG_DATA"));
+                            Path qiData = Utilities.ensureExists(tileFolder.resolve("QI_DATA"));
                             String refName = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
                             String metadataName = refName.replace("MSI", "MTD");
                             Path tileMetaFile = downloadFile(tileUrl + "/metadata.xml", tileFolder.resolve(metadataName + ".xml"));
-                            /*List<String> tileMetadataLines = Files.readAllLines(tileMetaFile);
-                            int gridCount = Utilities.filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
-                            if (gridCount != 13 * 12) {
-                                Logger.warn("Metadata for tile %s doesn't contain one or more angles grids!", tileName);
-                                if (!FillAnglesMethod.NONE.equals(this.fillMissingAnglesMethod)) {
-                                    try {
-                                        Map<String, MetaGrid> angleGridMap = XmlAnglesReader.parse(tileMetaFile);
-                                        List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
-                                        StringBuilder lines = new StringBuilder();
-                                        String message = "Angle grids have been computed for ";
-                                        Map<Integer, Set<Integer>> missingBandIds = new TreeMap<>();
-                                        for (ViewingIncidenceAngleGrid missingGrid : missingAngles) {
-                                            lines.append(missingGrid.toString());
-                                            int bandId = missingGrid.getBandId();
-                                            if (!missingBandIds.containsKey(bandId)) {
-                                                missingBandIds.put(bandId, new TreeSet<Integer>());
-                                            }
-                                            missingBandIds.get(bandId).add(missingGrid.getDetectorId());
-                                        }
-                                        if (missingBandIds.isEmpty()) {
-                                            message += String.valueOf(13*12-gridCount) + " missing detectors";
-                                        } else {
-                                            for (Map.Entry<Integer, Set<Integer>> e : missingBandIds.entrySet()) {
-                                                message += "band " + String.valueOf(e.getKey()) + " [detectors: " + Utilities.join(e.getValue(), ",") + "]; ";
-                                                *//*for (Integer d : e.getValue()) {
-                                                    message += Integer.valueOf(d) + ",";
-                                                }*//*
-                                                //message = message.substring(0, message.length() - 1) + "]; ";
-                                            }
-                                        }
-                                        String[] tokens = lines.toString().split("\n");
-                                        if(!insertAngles(tileMetaFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(angleGridMap, missingAngles, true), computeMeanAngles(angleGridMap, missingAngles, false)))) {
-                                            Logger.warn("Metadata for tile %s has not been updated!", tileName);
-                                        } else {
-                                            Logger.info(message);
-                                        }
-                                    } catch (Exception e) {
-                                        Logger.error(e.getMessage());
-                                    }
-                                }
-                            }*/
                             List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
                             for (String bandFileName : bandFiles) {
                                 try {
                                     downloadFile(tileUrl + URL_SEPARATOR + bandFileName, imgData.resolve(refName + NAME_SEPARATOR + bandFileName));
                                 } catch (IOException ex) {
-                                    Logger.warn("Download failed: " + bandFileName);
+                                    getLogger().warn("Download failed: " + bandFileName);
                                 }
                             }
                             List<String> lines = Utilities.filter(tileMetadataLines, "<MASK_FILENAME");
@@ -457,7 +390,7 @@ public class ProductDownloader {
                                 try {
                                     downloadFile(tileUrl + "/qi/" + remoteName, qiData.resolve(maskFileName));
                                 } catch (IOException ex) {
-                                    Logger.warn("Download failed: " + remoteName);
+                                    getLogger().warn("Download failed: " + remoteName);
                                 }
                             }
                             downloadFile(tileUrl + "/auxiliary/ECMWFT", auxData.resolve(refName.replace(tilePrefix, auxPrefix)));
@@ -472,7 +405,7 @@ public class ProductDownloader {
                                     JsonObject tileObj = tiReader.readObject();
                                     dataStripId = tileObj.getJsonObject("datastrip").getString("id");
                                     String dataStripPath = tileObj.getJsonObject("datastrip").getString("path") + "/metadata.xml";
-                                    Path dataStrip = ensureExists(dataStripFolder.resolve(dataStripId));
+                                    Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(dataStripId));
                                     String dataStripFile = dataStripId.substring(0, dataStripId.lastIndexOf(NAME_SEPARATOR)).replace("MSI", "MTD") + ".xml";
                                     downloadFile(baseUrl + dataStripPath, dataStrip.resolve(dataStripFile));
                                 } finally {
@@ -487,16 +420,16 @@ public class ProductDownloader {
                     }
                 } else {
                     Files.deleteIfExists(metadataFile);
-                    Files.deleteIfExists(rootPath);
-                    Logger.warn("The product %s did not contain any tiles from the tile list", productName);
+                    //Files.deleteIfExists(rootPath);
+                    getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
                 }
             } else {
-                Logger.warn("The product %s was not found in %s data bucket", productName, store);
+                getLogger().warn("The product %s was not found in %s data bucket", productName, store);
                 rootPath = null;
             }
         }
         if (rootPath != null && Files.exists(rootPath) && shouldCompress) {
-            Logger.info("Compressing product %s", product);
+            getLogger().info("Compressing product %s", product);
             Zipper.compress(rootPath, rootPath.getFileName().toString(), shouldDeleteAfterCompression);
         }
         return rootPath;
@@ -532,7 +465,7 @@ public class ProductDownloader {
             }
         }
         if (skippedTiles.length() > 0) {
-            Logger.info("Skipped tiles: %s", skippedTiles);
+            getLogger().info("Skipped tiles: %s", skippedTiles);
         }
         return ret;
     }
@@ -545,7 +478,7 @@ public class ProductDownloader {
             if (!Files.exists(file)) {
                 long remoteFileLength = connection.getContentLengthLong();
                 int kBytes = (int) (remoteFileLength / 1024);
-                Logger.info(startMessage, currentProduct, currentStep, file.getFileName(), kBytes);
+                getLogger().info(startMessage, currentProduct, currentStep, file.getFileName(), kBytes);
                 InputStream inputStream = null;
                 OutputStream outputStream = null;
                 try {
@@ -561,22 +494,22 @@ public class ProductDownloader {
                         Thread.yield();
                     }
                     Files.move(tmpFile, file);
-                    Logger.info(completeMessage, currentProduct, currentStep, file.getFileName(), (System.currentTimeMillis() - start) / 1000);
+                    getLogger().info(completeMessage, currentProduct, currentStep, file.getFileName(), (System.currentTimeMillis() - start) / 1000);
                 } finally {
                     if (outputStream != null) outputStream.close();
                     if (inputStream != null) inputStream.close();
                 }
             } else {
-                Logger.info(completeMessage, currentProduct, currentStep, file.getFileName(), 0);
+                getLogger().info(completeMessage, currentProduct, currentStep, file.getFileName(), 0);
             }
         } catch (FileNotFoundException fnex) {
-            Logger.warn(errorMessage, remoteUrl, "No such file");
+            getLogger().warn(errorMessage, remoteUrl, "No such file");
             file = null;
         } catch (InterruptedIOException iioe) {
-            Logger.error("Operation timed out");
+            getLogger().error("Operation timed out");
             throw new IOException("Operation timed out");
         } catch (Exception ex) {
-            Logger.error(errorMessage, remoteUrl, ex.getMessage());
+            getLogger().error(errorMessage, remoteUrl, ex.getMessage());
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -586,29 +519,6 @@ public class ProductDownloader {
             }
         }
         return file;
-    }
-
-    private Path ensureExists(Path folder) throws IOException {
-        if (!Files.exists(folder)) {
-            boolean supportsPosix = false;
-            FileSystem fileSystem = FileSystems.getDefault();
-            Iterable<FileStore> fileStores = fileSystem.getFileStores();
-            for (FileStore fs : fileStores) {
-                supportsPosix = fs.supportsFileAttributeView(PosixFileAttributeView.class);
-                if (supportsPosix) {
-                    break;
-                }
-            }
-            if (supportsPosix) {
-                Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rw-rw-rw-");
-                FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(perms);
-                folder = Files.createDirectory(folder, attrs);
-            } else {
-                folder = Files.createDirectory(folder);
-            }
-
-        }
-        return folder;
     }
 
     private boolean updateMedatata(Path metaFile, List<String> originalLines) throws IOException {
@@ -633,6 +543,10 @@ public class ProductDownloader {
             }
         }
         return canProceed;
+    }
+
+    private Logger.CustomLogger getLogger() {
+        return productLogger != null ? productLogger : Logger.getRootLogger();
     }
 
     private class ODataPath {

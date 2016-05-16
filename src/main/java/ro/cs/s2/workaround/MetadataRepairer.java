@@ -33,7 +33,7 @@ public class MetadataRepairer {
         List<String> tileMetadataLines = Files.readAllLines(metadataFile);
         int gridCount = Utilities.filter(tileMetadataLines, "<Viewing_Incidence_Angles_Grids").size();
         if (gridCount != 13 * 12) {
-            Logger.warn("Metadata %s doesn't contain one or more angles grids!", metadataFile.getFileName());
+            Logger.getRootLogger().warn("Metadata %s doesn't contain one or more angles grids!", metadataFile.getFileName());
             if (!FillAnglesMethod.NONE.equals(fillMissingAnglesMethod)) {
                 Map<String, MetaGrid> angleGridMap = XmlAnglesReader.parse(metadataFile);
                 List<ViewingIncidenceAngleGrid> missingAngles = computeMissingAngles(angleGridMap);
@@ -57,9 +57,9 @@ public class MetadataRepairer {
                 }
                 String[] tokens = lines.toString().split("\n");
                 if(!insertAngles(metadataFile, tileMetadataLines, Arrays.asList(tokens), meansToXml(computeMeanAngles(angleGridMap, missingAngles, true), computeMeanAngles(angleGridMap, missingAngles, false)))) {
-                    Logger.warn("Metadata for tile %s has not been updated!", metadataFile.getFileName());
+                    Logger.getRootLogger().warn("Metadata for tile %s has not been updated!", metadataFile.getFileName());
                 } else {
-                    Logger.info(message);
+                    Logger.getRootLogger().info(message);
                 }
             }
         }
@@ -129,10 +129,10 @@ public class MetadataRepairer {
                 buffer.append(Constants.LEVEL_3).append("<AZIMUTH_ANGLE unit=\"deg\">").append(azimuthMeans.containsKey(bandId)?(Serializable)azimuthMeans.get(bandId):"NaN").append("</AZIMUTH_ANGLE>\n");
                 buffer.append(Constants.LEVEL_2).append("</Mean_Viewing_Incidence_Angle>\n");
             }
-            Logger.info("Mean angles have been computed for bands " + Utilities.join(zenithMeans.keySet(), ","));
+            Logger.getRootLogger().info("Mean angles have been computed for bands " + Utilities.join(zenithMeans.keySet(), ","));
         }
         if (zenithMeans.size() == 0) {
-            Logger.info("No mean angle has been computed");
+            Logger.getRootLogger().info("No mean angle has been computed");
         }
         return Arrays.asList(buffer.toString().split("\n"));
     }
