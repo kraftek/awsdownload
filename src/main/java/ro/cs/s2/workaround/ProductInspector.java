@@ -9,6 +9,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Utility class for inspecting (and modifying if needed) a tree of products.
@@ -18,12 +19,14 @@ public class ProductInspector {
 
     private Path root;
     private FillAnglesMethod method;
+    private Set<String> products;
 
-    public ProductInspector(String path, FillAnglesMethod fillAnglesMethod) throws FileNotFoundException{
+    public ProductInspector(String path, FillAnglesMethod fillAnglesMethod, Set<String> products) throws FileNotFoundException{
         this.root = Paths.get(path);
         if (!Files.exists(this.root)) {
             throw new FileNotFoundException(path);
         }
+        this.products = products;
         this.method = fillAnglesMethod;
     }
 
@@ -32,9 +35,14 @@ public class ProductInspector {
                 new FileVisitor<Path>() {
                     @Override
                     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                        if (dir.equals(root)) {
+                            return FileVisitResult.CONTINUE;
+                        }
+                        if (!acceptPath(dir)) {
+                            return FileVisitResult.SKIP_SUBTREE;
+                        }
                         String dirName = dir.getFileName().toString();
-                        if ("AUX_DATA".equals(dirName) ||
-                                "DATASTRIP".equals(dirName)) {
+                        if ("AUX_DATA".equals(dirName) || "DATASTRIP".equals(dirName)) {
                             return FileVisitResult.SKIP_SUBTREE;
                         }
                         return FileVisitResult.CONTINUE;
@@ -74,5 +82,21 @@ public class ProductInspector {
                         return FileVisitResult.CONTINUE;
                     }
                 });
+    }
+
+    private boolean acceptPath(Path path) {
+        boolean result = true;
+        if (products != null) {
+            String fullPath = path.toAbsolutePath().toString();
+            boolean found = false;
+            for (String product : products) {
+                if (fullPath.contains(product)) {
+                    found = true;
+                    break;
+                }
+            }
+            result = found;
+        }
+        return result;
     }
 }

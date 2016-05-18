@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -261,10 +260,11 @@ public class S2ProductDownloader {
         CommandLineParser parser = new DefaultParser();
         CommandLine commandLine = parser.parse(options, args);
         String logFile = props.getProperty("master.log.file");
-        Path jarPath = Paths.get(S2ProductDownloader.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-        String folder = jarPath.getParent().toAbsolutePath().toString();
-        Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString());
+        //Path jarPath = Paths.get(S2ProductDownloader.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        String folder; //jarPath.getParent().toAbsolutePath().toString();
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
+            folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
+            Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString());
             String rootFolder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             FillAnglesMethod fillAnglesMethod = Enum.valueOf(FillAnglesMethod.class,
                     commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
@@ -272,7 +272,18 @@ public class S2ProductDownloader {
                             FillAnglesMethod.NONE.name());
             if (!FillAnglesMethod.NONE.equals(fillAnglesMethod)) {
                 try {
-                    ProductInspector inspector = new ProductInspector(rootFolder, fillAnglesMethod);
+                    Set<String> products = null;
+                    if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST)) {
+                        products = new HashSet<>();
+                        for (String product : commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST)) {
+                            if (!product.endsWith(".SAFE")) {
+                                products.add(product + ".SAFE");
+                            } else {
+                                products.add(product);
+                            }
+                        }
+                    }
+                    ProductInspector inspector = new ProductInspector(rootFolder, fillAnglesMethod, products);
                     inspector.traverse();
                 } catch (IOException e) {
                     Logger.getRootLogger().error(e.getMessage());
@@ -280,6 +291,8 @@ public class S2ProductDownloader {
                 }
             }
         } else {
+            folder = commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER);
+            Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString());
             List<ProductDescriptor> products = new ArrayList<>();
             Set<String> tiles = new HashSet<>();
             Polygon2D areaOfInterest = new Polygon2D();
