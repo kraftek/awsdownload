@@ -1,12 +1,11 @@
 package ro.cs.s2;
 
 import org.apache.commons.cli.*;
-import ro.cs.s2.util.Constants;
-import ro.cs.s2.util.Logger;
-import ro.cs.s2.util.NetUtils;
+import ro.cs.s2.util.*;
 import ro.cs.s2.workaround.FillAnglesMethod;
 import ro.cs.s2.workaround.ProductInspector;
 
+import java.awt.geom.Rectangle2D;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -63,9 +62,17 @@ public class S2ProductDownloader {
                 .hasArg()
                 .optionalArg(true)
                 .build();
+        Option optionTileShapeFile = Option.builder(Constants.PARAM_TILE_SHAPE_FILE)
+                .longOpt("tileshapes")
+                .argName("tile.shapes.file")
+                .desc("The kml file containing Sentinel-2 tile extents")
+                .hasArg()
+                .optionalArg(true)
+                .build();
         OptionGroup areaGroup = new OptionGroup();
         areaGroup.addOption(optionArea);
         areaGroup.addOption(optionAreaFile);
+        areaGroup.addOption(optionTileShapeFile);
         options.addOptionGroup(areaGroup);
 
         Option optionTileList = Option.builder(Constants.PARAM_TILE_LIST)
@@ -256,15 +263,19 @@ public class S2ProductDownloader {
             formatter.printHelp("S2ProductDownload", options);
             System.exit(0);
         }
-        boolean succeeded = true;
+        int retCode = ReturnCode.OK;
         CommandLineParser parser = new DefaultParser();
         CommandLine commandLine = parser.parse(options, args);
         String logFile = props.getProperty("master.log.file");
-        //Path jarPath = Paths.get(S2ProductDownloader.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-        String folder; //jarPath.getParent().toAbsolutePath().toString();
+        String folder;
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
             folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
+            Utilities.ensureExists(Paths.get(folder));
             Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString());
+            Logger.getRootLogger().info("Executing with the following arguments:");
+            for (Option option : commandLine.getOptions()) {
+                Logger.getRootLogger().info(option.getOpt() + "=" + option.getValue());
+            }
             String rootFolder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             FillAnglesMethod fillAnglesMethod = Enum.valueOf(FillAnglesMethod.class,
                     commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
@@ -287,12 +298,17 @@ public class S2ProductDownloader {
                     inspector.traverse();
                 } catch (IOException e) {
                     Logger.getRootLogger().error(e.getMessage());
-                    succeeded = false;
+                    retCode = ReturnCode.DOWNLOAD_ERROR;
                 }
             }
         } else {
             folder = commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER);
+            Utilities.ensureExists(Paths.get(folder));
             Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString());
+            Logger.getRootLogger().info("Executing with the following arguments:");
+            for (Option option : commandLine.getOptions()) {
+                Logger.getRootLogger().info(option.getOpt() + "=" + option.getValue());
+            }
             List<ProductDescriptor> products = new ArrayList<>();
             Set<String> tiles = new HashSet<>();
             Polygon2D areaOfInterest = new Polygon2D();
@@ -332,6 +348,13 @@ public class S2ProductDownloader {
                 }
             } else if (commandLine.hasOption(Constants.PARAM_AREA_FILE)) {
                 areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue(Constants.PARAM_AREA_FILE))), StandardCharsets.UTF_8));
+            } else if (commandLine.hasOption(Constants.PARAM_TILE_SHAPE_FILE)) {
+                String tileShapeFile = commandLine.getOptionValue(Constants.PARAM_TILE_SHAPE_FILE);
+                if (Files.exists(Paths.get(tileShapeFile))) {
+                    Logger.getRootLogger().info("Reading S2 tiles extents");
+                    TilesMap.fromKmlFile(tileShapeFile);
+                    Logger.getRootLogger().info(String.valueOf(TilesMap.getCount() + " tiles found"));
+                }
             }
 
             if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
@@ -410,6 +433,15 @@ public class S2ProductDownloader {
             }
 
             int numPoints = areaOfInterest.getNumPoints();
+            if (numPoints == 0 && TilesMap.getCount() > 0) {
+                Rectangle2D rectangle2D = TilesMap.boundingBox(commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
+                areaOfInterest.append(rectangle2D.getX(), rectangle2D.getY());
+                areaOfInterest.append(rectangle2D.getMaxX(), rectangle2D.getY());
+                areaOfInterest.append(rectangle2D.getMaxX(), rectangle2D.getMaxY());
+                areaOfInterest.append(rectangle2D.getX(), rectangle2D.getMaxY());
+                areaOfInterest.append(rectangle2D.getX(), rectangle2D.getY());
+            }
+            numPoints = areaOfInterest.getNumPoints();
             if (numPoints > 0) {
                 String searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
                 if (!NetUtils.isAvailable(searchUrl)) {
@@ -430,9 +462,9 @@ public class S2ProductDownloader {
                 products = search.execute();
             }
             downloader.setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
-            succeeded = downloader.downloadProducts(products);
+            retCode = downloader.downloadProducts(products);
         }
-        System.exit(succeeded ? 0 : -1);
+        System.exit(retCode);
     }
 
     private static String nullIfEmpty(String string) {

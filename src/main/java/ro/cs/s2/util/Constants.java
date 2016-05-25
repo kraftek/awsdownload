@@ -1,7 +1,9 @@
 package ro.cs.s2.util;
 
 /**
- * Created by kraftek on 4/26/2016.
+ * Constants used throughout the code
+ *
+ * @author Cosmin Cara
  */
 public class Constants {
     public static final String PARAM_AREA = "a";
@@ -11,6 +13,7 @@ public class Constants {
     public static final String PARAM_OUT_FOLDER = "o";
     public static final String PARAM_INPUT_FOLDER = "i";
     public static final String PARAM_AREA_FILE = "af";
+    public static final String PARAM_TILE_SHAPE_FILE = "ts";
     public static final String PARAM_TILE_LIST_FILE = "tf";
     public static final String PARAM_PRODUCT_LIST_FILE = "pf";
     public static final String PARAM_CLOUD_PERCENTAGE = "cp";

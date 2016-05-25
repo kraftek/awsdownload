@@ -116,6 +116,10 @@ public class Polygon2D {
         return buffer.toString();
     }
 
+    public Rectangle2D getBounds2D() {
+        return polygon.getBounds2D();
+    }
+
     public String toWKTBounds() {
         Rectangle2D bounds2D = polygon.getBounds2D();
         return  "POLYGON((" +

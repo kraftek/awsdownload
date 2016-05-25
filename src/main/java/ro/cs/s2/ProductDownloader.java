@@ -141,8 +141,8 @@ public class ProductDownloader {
         this.fillMissingAnglesMethod = value;
     }
 
-    public boolean downloadProducts(List<ProductDescriptor> products){
-        int failedProducts = 0;
+    public int downloadProducts(List<ProductDescriptor> products){
+        int retCode = ReturnCode.OK;
         if (products != null) {
             int productCounter = 1, productCount = products.size();
             for (ProductDescriptor product : products) {
@@ -153,11 +153,13 @@ public class ProductDownloader {
                     Utilities.ensureExists(Paths.get(destination));
                     file = download(product);
                     if (file == null) {
+                        retCode = ReturnCode.EMPTY_PRODUCT;
                         getLogger().warn("Product download aborted");
                     }
                 } catch (IOException ignored) {
                     getLogger().warn("IO Exception: " + ignored.getMessage());
                     getLogger().warn("Product download failed");
+                    retCode = ReturnCode.DOWNLOAD_ERROR;
                 } finally {
                     if (productLogger != null) {
                         try {
@@ -172,12 +174,10 @@ public class ProductDownloader {
                 long millis = System.currentTimeMillis() - startTime;
                 if (file != null && Files.exists(file)) {
                     getLogger().info("Product download completed in %s", Utilities.formatTime(millis));
-                } else {
-                    failedProducts++;
                 }
             }
         }
-        return (products != null && products.size() > failedProducts);
+        return retCode;
     }
 
     public Path download(ProductDescriptor product) throws IOException {
@@ -299,7 +299,7 @@ public class ProductDownloader {
                     }
                 } else {
                     Files.deleteIfExists(metadataFile);
-                    Files.deleteIfExists(rootPath);
+                    //Files.deleteIfExists(rootPath);
                     getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
                 }
             } else {
