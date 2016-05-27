@@ -63,7 +63,7 @@ public class S2ProductDownloader {
                 .optionalArg(true)
                 .build();
         Option optionTileShapeFile = Option.builder(Constants.PARAM_TILE_SHAPE_FILE)
-                .longOpt("tileshapes")
+                .longOpt("shapetiles")
                 .argName("tile.shapes.file")
                 .desc("The kml file containing Sentinel-2 tile extents")
                 .hasArg()
@@ -129,14 +129,14 @@ public class S2ProductDownloader {
                 .argName("user")
                 .desc("User account to connect to SCIHUB")
                 .hasArg(true)
-                .required(false)
+                .required(true)
                 .build());
         options.addOption(Option.builder(Constants.PARAM_PASSWORD)
                 .longOpt("password")
                 .argName("password")
                 .desc("Password to connect to SCIHUB")
                 .hasArg(true)
-                .required(false)
+                .required(true)
                 .build());
 
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)

@@ -300,6 +300,7 @@ public class ProductDownloader {
                 } else {
                     Files.deleteIfExists(metadataFile);
                     //Files.deleteIfExists(rootPath);
+                    rootPath = null;
                     getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
                 }
             } else {
@@ -421,6 +422,7 @@ public class ProductDownloader {
                 } else {
                     Files.deleteIfExists(metadataFile);
                     //Files.deleteIfExists(rootPath);
+                    rootPath = null;
                     getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
                 }
             } else {
