@@ -129,14 +129,14 @@ public class S2ProductDownloader {
                 .argName("user")
                 .desc("User account to connect to SCIHUB")
                 .hasArg(true)
-                .required(true)
+                .required(false)
                 .build());
         options.addOption(Option.builder(Constants.PARAM_PASSWORD)
                 .longOpt("password")
                 .argName("password")
                 .desc("Password to connect to SCIHUB")
                 .hasArg(true)
-                .required(true)
+                .required(false)
                 .build());
 
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)

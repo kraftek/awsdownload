@@ -17,6 +17,8 @@ import java.util.concurrent.TimeUnit;
  */
 public class Utilities {
 
+    private static Boolean supportsPosix;
+
     public static String join(Iterable collection, String separator) {
         String result = "";
         if (collection != null) {
@@ -76,16 +78,7 @@ public class Utilities {
 
     public static Path ensureExists(Path folder) throws IOException {
         if (folder != null && !Files.exists(folder)) {
-            boolean supportsPosix = false;
-            FileSystem fileSystem = FileSystems.getDefault();
-            Iterable<FileStore> fileStores = fileSystem.getFileStores();
-            for (FileStore fs : fileStores) {
-                supportsPosix = fs.supportsFileAttributeView(PosixFileAttributeView.class);
-                if (supportsPosix) {
-                    break;
-                }
-            }
-            if (supportsPosix) {
+            if (isPosixFileSystem()) {
                 Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
                 FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(perms);
                 folder = Files.createDirectory(folder, attrs);
@@ -95,5 +88,30 @@ public class Utilities {
 
         }
         return folder;
+    }
+
+    public static Path ensurePermissions(Path file) throws IOException {
+        if (file != null && Files.exists(file)) {
+            if (isPosixFileSystem()) {
+                Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
+                file = Files.setPosixFilePermissions(file, perms);
+            }
+        }
+        return file;
+    }
+
+    private static boolean isPosixFileSystem() {
+        if (supportsPosix == null) {
+            supportsPosix = Boolean.FALSE;
+            FileSystem fileSystem = FileSystems.getDefault();
+            Iterable<FileStore> fileStores = fileSystem.getFileStores();
+            for (FileStore fs : fileStores) {
+                supportsPosix = fs.supportsFileAttributeView(PosixFileAttributeView.class);
+                if (supportsPosix) {
+                    break;
+                }
+            }
+        }
+        return supportsPosix;
     }
 }

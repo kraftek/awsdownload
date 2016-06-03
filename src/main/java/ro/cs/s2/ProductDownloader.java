@@ -520,7 +520,7 @@ public class ProductDownloader {
                 Files.deleteIfExists(tmpFile);
             }
         }
-        return file;
+        return Utilities.ensurePermissions(file);
     }
 
     private boolean updateMedatata(Path metaFile, List<String> originalLines) throws IOException {
