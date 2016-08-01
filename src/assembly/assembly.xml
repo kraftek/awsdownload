@@ -1,7 +1,7 @@
 <assembly>
     <id>bin</id>
     <formats>
-        <format>zip</format>
+        <format>dir</format>
     </formats>
 
     <dependencySets>
@@ -16,9 +16,6 @@
         <fileSet>
             <directory>${project.build.scriptSourceDirectory}</directory>
             <outputDirectory></outputDirectory>
-            <!--<includes>
-                <include>startup.*</include>
-            </includes>-->
         </fileSet>
         <fileSet>
             <directory>${project.build.directory}</directory>
