@@ -19,9 +19,13 @@ Filtering on products is mutually exclusive with filtering on an area of interes
     git clone https://github.com/kraftek/awsdownload.git
 2. Build and package the project:
     mvn clean package -DskipTests=true
+3. Assemble the jar and dependencies:
+    mvn assembly:assembly
 3. The folder "lib" and the generated jar should be placed on the same folder. Then:
     java -jar S2ProductDownloader-1.0.jar
    for a list of supported command line arguments.
+
+Note: The project requires Java 8 to be installed.
 
 A simple example:
     java -jar S2ProductDownloader-1.0.jar --out D:\Products --tiles 34TFQ 35TNL --products S2A_OPER_PRD_MSIL1C_PDMC_20160103T183955_R064_V20160103T085753_20160103T085753 --store AWS
