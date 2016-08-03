@@ -11,6 +11,7 @@ a tile list on the command line, or by putting tiles in a dedicated file which i
 supplied either as a list of comma-separated pairs of coordinates as argument, or in a file given as argument.
 3. Can download products / tiles given a list of products.
 4. Can download only products / tiles whose cloud coverage is below a given threshold.
+5. Can download tiles by only giving the tile list.
 
 Filtering on products is mutually exclusive with filtering on an area of interest. The AOI is used to query SciHub for products intersecting it, optionally by supplying the start and end of sensing times. If the AOI is a polygon which has more than 200 points, the extent (bounding box) of this polygon will be used instead.
 
@@ -28,7 +29,7 @@ Filtering on products is mutually exclusive with filtering on an area of interes
 Note: The project requires Java 8 to be installed.
 
 A simple example:
-    java -jar S2ProductDownloader-1.0.jar --out D:\Products --tiles 34TFQ 35TNL --products S2A_OPER_PRD_MSIL1C_PDMC_20160103T183955_R064_V20160103T085753_20160103T085753 --store AWS
+    java -jar S2ProductDownloader-1.0.jar --out D:\Products --tiles 34TFQ --startdate 2016-07-13 --relative.orbit 93 --store AWS --cloudpercentage 30
 
 #Configuration considerations
 It may be possible that you are behind a proxy. In this case, please either pass the proxy arguments from command line or edit the download.properties file and set them accordingly.
