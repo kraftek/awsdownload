@@ -379,7 +379,7 @@ public class S2ProductDownloader {
                                      new InputStreamReader(
                                              S2ProductDownloader.class.getResourceAsStream("tilemap.dat")));
                 Logger.getRootLogger().info("Loading S2 tiles extents");
-                TilesMap.fromKml(reader);
+                TilesMap.read(reader);
                 Logger.getRootLogger().info(String.valueOf(TilesMap.getCount() + " tile extents loaded"));
             }
 

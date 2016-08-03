@@ -23,32 +23,27 @@ public class TilesMap {
 
     private static Map<String, Rectangle2D> tiles = new TreeMap<>();
 
-    public static boolean read(Path file) throws IOException {
+    public static boolean read(BufferedReader bufferedReader) throws IOException {
         boolean read = false;
-        if (Files.exists(file)) {
-            BufferedReader bufferedReader = null;
-            try {
-                bufferedReader = Files.newBufferedReader(file);
-                String line = null;
-                int idx = -1;
-                String tile = "";
-                while ((line = bufferedReader.readLine()) != null) {
-                    tile = line.substring(0, line.indexOf(" "));
-                    line = line.replaceAll(tile, "").trim();
-                    line = line.substring(1, line.length() - 1);
-                    String[] tokens = line.split(",");
-                    Rectangle2D.Double rectangle = new Rectangle2D.Double(
-                            Double.parseDouble(tokens[0].substring(2)),
-                            Double.parseDouble(tokens[1].substring(2)),
-                            Double.parseDouble(tokens[2].substring(2)),
-                            Double.parseDouble(tokens[3].substring(2)));
-                    tiles.put(tile, rectangle);
-                }
-                read = true;
-            } finally {
-                if (bufferedReader != null)
-                    bufferedReader.close();
+        try {
+            String line;
+            String tile = "";
+            while ((line = bufferedReader.readLine()) != null) {
+                tile = line.substring(0, line.indexOf(" "));
+                line = line.replaceAll(tile, "").trim();
+                //line = line.substring(0, line.length() - 1);
+                String[] tokens = line.split(",");
+                Rectangle2D.Double rectangle = new Rectangle2D.Double(
+                        Double.parseDouble(tokens[0].substring(2)),
+                        Double.parseDouble(tokens[1].substring(2)),
+                        Double.parseDouble(tokens[2].substring(2)),
+                        Double.parseDouble(tokens[3].substring(2)));
+                tiles.put(tile, rectangle);
             }
+            read = true;
+        } finally {
+            if (bufferedReader != null)
+                bufferedReader.close();
         }
         return read;
     }
