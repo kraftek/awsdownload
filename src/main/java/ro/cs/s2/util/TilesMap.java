@@ -14,14 +14,16 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Created by kraftek on 5/23/2016.
+ * Map of S2 tile extents. The initial map can be created from the official
+ * S2A_OPER_GIP_TILPAR_MPC__20151209T095117_V20150622T000000_21000101T000000_B00.kml file.
+ *
+ * @author Cosmin Cara
  */
 public class TilesMap {
 
     private static Map<String, Rectangle2D> tiles = new TreeMap<>();
 
-    public static boolean read(String fromFile) throws IOException {
-        Path file = Paths.get(fromFile);
+    public static boolean read(Path file) throws IOException {
         boolean read = false;
         if (Files.exists(file)) {
             BufferedReader bufferedReader = null;
@@ -51,14 +53,21 @@ public class TilesMap {
         return read;
     }
 
-    public static void write(String toFile) throws IOException {
-        Path file = Paths.get(toFile);
+    public static void write(Path file) throws IOException {
         BufferedWriter bufferedWriter = null;
         try {
             bufferedWriter = Files.newBufferedWriter(file, StandardOpenOption.CREATE);
+            StringBuilder line = new StringBuilder();
             for (Map.Entry<String, Rectangle2D> entry : tiles.entrySet()) {
-                bufferedWriter.write(entry.getKey() + " " + entry.getValue().toString() + "\n");
+                line.append(entry.getKey()).append(" ");
+                Rectangle2D rectangle = entry.getValue();
+                line.append("x=").append(rectangle.getX()).append(",");
+                line.append("y=").append(rectangle.getY()).append(",");
+                line.append("w=").append(rectangle.getWidth()).append(",");
+                line.append("h=").append(rectangle.getHeight()).append("\n");
+                bufferedWriter.write(line.toString());
                 bufferedWriter.flush();
+                line.setLength(0);
             }
         } finally {
             if (bufferedWriter != null)
@@ -100,6 +109,38 @@ public class TilesMap {
                 if (bufferedReader != null)
                     bufferedReader.close();
             }
+        }
+    }
+
+    public static void fromKml(BufferedReader bufferedReader) throws IOException {
+        boolean read = false;
+        try {
+            String line;
+            String tileCode = null;
+            boolean inElement = false;
+            while ((line = bufferedReader.readLine()) != null) {
+                if (line.contains("<Placemark>")) {
+                    inElement = true;
+                } else {
+                    if (inElement && line.contains("<name>")) {
+                        int i = line.indexOf("<name>");
+                        tileCode = line.substring(i + 6, i + 11);
+                    }
+                    if (inElement && !line.trim().startsWith("<")) {
+                        String[] tokens = line.trim().split(" ");
+                        Polygon2D polygon = new Polygon2D();
+                        for (String point : tokens) {
+                            String[] coords = point.split(",");
+                            polygon.append(Double.parseDouble(coords[0]), Double.parseDouble(coords[1]));
+                        }
+                        tiles.put(tileCode, polygon.getBounds2D());
+                        inElement = false;
+                    }
+                }
+            }
+        } finally {
+            if (bufferedReader != null)
+                bufferedReader.close();
         }
     }
 

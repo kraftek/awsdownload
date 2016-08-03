@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2016 Cosmin Cara
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 3 of the License, or (at your option)
+ * any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ *  with this program; if not, see http://www.gnu.org/licenses/
+ */
 package ro.cs.s2;
 
 import ro.cs.s2.util.Logger;
@@ -335,7 +350,7 @@ public class ProductDownloader {
             Path metadataFile = rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
             currentStep = "Metadata";
             downloadFile(url, metadataFile);
-            Path inspireFile = metadataFile.resolveSibling("inspire.xml");
+            Path inspireFile = metadataFile.resolveSibling("INSPIRE.xml");
             Path manifestFile = metadataFile.resolveSibling("manifest.safe");
             Path previewFile = metadataFile.resolveSibling("preview.png");
             if (Files.exists(metadataFile)) {
@@ -346,6 +361,19 @@ public class ProductDownloader {
                     downloadFile(baseProductUrl + "inspire.xml", inspireFile);
                     downloadFile(baseProductUrl + "manifest.safe", manifestFile);
                     downloadFile(baseProductUrl + "preview.png", previewFile);
+
+                    // rep_info folder and contents
+                    Path repFolder = Utilities.ensureExists(rootPath.resolve("rep_info"));
+                    copyFromResources("S2_User_Product_Level-1C_Metadata.xsd", repFolder);
+                    // HTML folder and contents
+                    Path htmlFolder = Utilities.ensureExists(rootPath.resolve("HTML"));
+                    copyFromResources("banner_1.png", htmlFolder);
+                    copyFromResources("banner_2.png", htmlFolder);
+                    copyFromResources("banner_3.png", htmlFolder);
+                    copyFromResources("star_bg.jpg", htmlFolder);
+                    copyFromResources("UserProduct_index.html", htmlFolder);
+                    copyFromResources("UserProduct_index.xsl", htmlFolder);
+
                     Path tilesFolder = Utilities.ensureExists(rootPath.resolve("GRANULE"));
                     Utilities.ensureExists(rootPath.resolve("AUX_DATA"));
                     Path dataStripFolder = Utilities.ensureExists(rootPath.resolve("DATASTRIP"));
@@ -407,6 +435,7 @@ public class ProductDownloader {
                                     dataStripId = tileObj.getJsonObject("datastrip").getString("id");
                                     String dataStripPath = tileObj.getJsonObject("datastrip").getString("path") + "/metadata.xml";
                                     Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(dataStripId));
+                                    Utilities.ensureExists(dataStripFolder.resolve("QI_DATE"));
                                     String dataStripFile = dataStripId.substring(0, dataStripId.lastIndexOf(NAME_SEPARATOR)).replace("MSI", "MTD") + ".xml";
                                     downloadFile(baseUrl + dataStripPath, dataStrip.resolve(dataStripFile));
                                 } finally {
@@ -545,6 +574,17 @@ public class ProductDownloader {
             }
         }
         return canProceed;
+    }
+
+    private void copyFromResources(String fileName, Path folder) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(getClass().getResourceAsStream(fileName)))) {
+            String line = null;
+            StringBuilder builder = new StringBuilder();
+            while ((line = reader.readLine()) != null) {
+                builder.append(line).append("\n");
+            }
+            Utilities.ensurePermissions(Files.write(folder.resolve(fileName), builder.toString().getBytes()));
+        }
     }
 
     private Logger.CustomLogger getLogger() {

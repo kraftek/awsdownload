@@ -1,9 +1,26 @@
+/*
+ * Copyright (C) 2016 Cosmin Cara
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 3 of the License, or (at your option)
+ * any later version.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ *  with this program; if not, see http://www.gnu.org/licenses/
+ */
 package ro.cs.s2.workaround;
 
 import java.util.*;
 
 /**
- * Created by kraftek on 4/26/2016.
+ * This class manipulates the angle grids of a product.
+ *
+ * @author Cosmin Cara
  */
 public class MetaGrid {
 
@@ -14,6 +31,10 @@ public class MetaGrid {
     private FillAnglesMethod method;
     private Map<Integer, MeanBandAngle> bandMeanAngles;
 
+    /**
+     * Constructs a meta grid having the given number of rows and columns, and for which
+     * the bands order is specified.
+     */
     public MetaGrid(int[] bandsOrder, int rows, int cols) {
         int bands = bandsOrder != null ? bandsOrder.length : 13;
         angleGrids = new AngleGrid[12][bands];
@@ -32,11 +53,20 @@ public class MetaGrid {
         this.method = FillAnglesMethod.NONE;
         this.bandMeanAngles = new HashMap<>();
     }
-
+    /**
+     * Sets the fill method for missing angles.
+     */
     public void setFillMethod(FillAnglesMethod method) {
         this.method = method;
     }
 
+    /**
+     * Adds an angles grid to this meta grid, for the given band and detector.
+     *
+     * @param detectorId    The detector identifier
+     * @param bandId        The band identifier
+     * @param grid          The angles grid
+     */
     public void addGrid(int detectorId, int bandId, AngleGrid grid) {
         checkValidIndices(detectorId - 1, bandId);
         if (grid == null || grid.getRowsCount() != rows || grid.getColsCount() != cols) {
@@ -46,11 +76,21 @@ public class MetaGrid {
         angleGrids[detectorId - 1][bandIndex] = grid;
     }
 
+    /**
+     * Returns the angles grid for the given band and detector.
+     *
+     * @param bandId        The band identifier
+     * @param detectorId    The detector identifier
+     */
     public AngleGrid getGrid(int bandId, int detectorId) {
         checkValidIndices(detectorId - 1, bandId);
         return angleGrids[detectorId - 1][bandIndices.get(bandId)];
     }
-
+    /**
+     * Returns all the angles grids for a given band.
+     *
+     * @param bandId    The band identifier
+     */
     public List<AngleGrid> getBandGrids(int bandId) {
         checkValidIndices(0, bandId);
         int bandIdx = bandIndices.get(bandId);
@@ -61,6 +101,11 @@ public class MetaGrid {
         return grids;
     }
 
+    /**
+     * Returns the band identifier for the band at the given index.
+     * The order of the bands may not be given by the identifiers of the bands.
+     * @param bandIdx  The band index
+     */
     public int getBandIdFromIndex(int bandIdx) {
         int bandId = -1;
         for (Map.Entry<Integer, Integer> entry : bandIndices.entrySet()) {
@@ -71,15 +116,26 @@ public class MetaGrid {
         }
         return bandId;
     }
-
+    /**
+     * Sets the mean angles values for a band.
+     *
+     * @param meanAngles    The mean band angle values holder.
+     */
     public void setBandMeanAngles(MeanBandAngle meanAngles) {
         if (meanAngles != null) {
             this.bandMeanAngles.put(meanAngles.getBandId(), meanAngles);
         }
     }
-
+    /**
+     * Returns the mean angles values for all bands.
+     */
     public Map<Integer, MeanBandAngle> getBandMeanAngles() { return this.bandMeanAngles; }
 
+    /**
+     * Returns the mean value for a band.
+     *
+     * @param bandId    The band identifier
+     */
     public double getBandMeanValue(int bandId) {
         checkValidIndices(0, bandId);
         int bandIdx = bandIndices.get(bandId);
@@ -97,6 +153,11 @@ public class MetaGrid {
         return count > 0 ? sum / (double) count : Double.NaN;
     }
 
+    /**
+     * Fills the missing angles values / grids.
+     *
+     * @return  A set of band identifiers for the modified band grids.
+     */
     public Set<Integer[]> fillGaps() {
         Set<Integer[]> missingBands = new HashSet<>();
         if (angleGrids.length > 0) {
