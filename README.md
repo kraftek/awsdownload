@@ -29,7 +29,7 @@ Filtering on products is mutually exclusive with filtering on an area of interes
 Note: The project requires Java 8 to be installed.
 
 A simple example:
-    java -jar S2ProductDownloader-1.0.jar --out D:\Products --tiles 34TFQ --startdate 2016-07-13 --relative.orbit 93 --store AWS --cloudpercentage 30
+    java -jar S2ProductDownloader-1.0.jar --out D:\Products --tiles 34TFQ --startdate 2016-07-12 --relative.orbit 93 --store AWS --cloudpercentage 50 --user <scihub_user> --password <scihub_password>
 
 #Configuration considerations
 It may be possible that you are behind a proxy. In this case, please either pass the proxy arguments from command line or edit the download.properties file and set them accordingly.
