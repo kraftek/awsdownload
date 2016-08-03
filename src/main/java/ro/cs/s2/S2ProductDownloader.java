@@ -147,14 +147,14 @@ public class S2ProductDownloader {
                 .argName("user")
                 .desc("User account to connect to SCIHUB")
                 .hasArg(true)
-                .required(false)
+                .required()
                 .build());
         options.addOption(Option.builder(Constants.PARAM_PASSWORD)
                 .longOpt("password")
                 .argName("password")
                 .desc("Password to connect to SCIHUB")
                 .hasArg(true)
-                .required(false)
+                .required()
                 .build());
 
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
@@ -351,7 +351,7 @@ public class S2ProductDownloader {
 
             String user = commandLine.getOptionValue(Constants.PARAM_USER);
             String pwd = commandLine.getOptionValue(Constants.PARAM_PASSWORD);
-            if (!user.isEmpty() && !pwd.isEmpty()) {
+            if (user != null && pwd != null && !user.isEmpty() && !pwd.isEmpty()) {
                 String authToken = "Basic " + new String(Base64.getEncoder().encode((user + ":" + pwd).getBytes()));
                 NetUtils.setAuthToken(authToken);
             }
