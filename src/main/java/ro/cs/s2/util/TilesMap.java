@@ -10,8 +10,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 /**
  * Map of S2 tile extents. The initial map can be created from the official
@@ -23,11 +26,9 @@ public class TilesMap {
 
     private static Map<String, Rectangle2D> tiles = new TreeMap<>();
 
-    public static boolean read(BufferedReader bufferedReader) throws IOException {
-        boolean read = false;
+    public static void read(BufferedReader bufferedReader) throws IOException {
         try {
-            String line;
-            String tile = "";
+            String line, tile;
             while ((line = bufferedReader.readLine()) != null) {
                 tile = line.substring(0, line.indexOf(" "));
                 line = line.replaceAll(tile, "").trim();
@@ -40,12 +41,10 @@ public class TilesMap {
                         Double.parseDouble(tokens[3].substring(2)));
                 tiles.put(tile, rectangle);
             }
-            read = true;
         } finally {
             if (bufferedReader != null)
                 bufferedReader.close();
         }
-        return read;
     }
 
     public static void write(Path file) throws IOException {
@@ -72,12 +71,11 @@ public class TilesMap {
 
     public static void fromKmlFile(String file) throws IOException {
         Path kmlFile = Paths.get(file);
-        boolean read = false;
         if (Files.exists(kmlFile)) {
             BufferedReader bufferedReader = null;
             try {
                 bufferedReader = Files.newBufferedReader(kmlFile);
-                String line = null;
+                String line;
                 String tileCode = null;
                 boolean inElement = false;
                 while ((line = bufferedReader.readLine()) != null) {
@@ -108,7 +106,6 @@ public class TilesMap {
     }
 
     public static void fromKml(BufferedReader bufferedReader) throws IOException {
-        boolean read = false;
         try {
             String line;
             String tileCode = null;
@@ -139,10 +136,17 @@ public class TilesMap {
         }
     }
 
+    /**
+     * Returns the number of tiles contained in this map
+     */
     public static int getCount() {
         return tiles.size();
     }
 
+    /**
+     * Computes the bounding box for the given list of tile identifiers
+     * @param tileCodes     List of tile identifiers
+     */
     public static Rectangle2D boundingBox(String...tileCodes) {
         if (tileCodes == null) {
             return null;
@@ -159,6 +163,32 @@ public class TilesMap {
             }
         }
         return accumulator;
+    }
+
+    /**
+     * Computes the list of tiles that intersect the given area of interest (rectangle).
+     *
+     * @param ulx   The upper left corner longitude (in degrees)
+     * @param uly   The upper left corner latitude (in degrees)
+     * @param lrx   The lower right corner longitude (in degrees)
+     * @param lry   The lower right corner latitude (in degrees)
+     */
+    public static Set<String> intersectingTiles(double ulx, double uly, double lrx, double lry) {
+        return intersectingTiles(new Rectangle2D.Double(ulx, uly, ulx - lrx, uly - lry));
+    }
+    /**
+     * Computes the list of tiles that intersect the given area of interest (rectangle).
+     *
+     * @param aoi   The area of interest bounding box
+     */
+    public static Set<String> intersectingTiles(Rectangle2D aoi) {
+        Set<String> tileCodes = new HashSet<>();
+        tileCodes.addAll(
+                tiles.entrySet().stream()
+                        .filter(entry -> entry.getValue().intersects(aoi))
+                        .map(Map.Entry::getKey)
+                        .collect(Collectors.toSet()));
+        return tileCodes;
     }
 
     private Rectangle2D boundingBox(Rectangle2D...rectangles) {

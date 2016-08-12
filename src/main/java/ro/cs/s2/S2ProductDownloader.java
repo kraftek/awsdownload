@@ -24,10 +24,10 @@ import java.awt.geom.Rectangle2D;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -41,7 +41,7 @@ import java.util.*;
 public class S2ProductDownloader {
 
     private static Options options;
-    static Properties props;
+    private static Properties props;
 
     static {
         options = new Options();
@@ -147,14 +147,14 @@ public class S2ProductDownloader {
                 .argName("user")
                 .desc("User account to connect to SCIHUB")
                 .hasArg(true)
-                .required()
+                .required(false)
                 .build());
         options.addOption(Option.builder(Constants.PARAM_PASSWORD)
                 .longOpt("password")
                 .argName("password")
                 .desc("Password to connect to SCIHUB")
                 .hasArg(true)
-                .required()
+                .required(false)
                 .build());
 
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
@@ -230,6 +230,13 @@ public class S2ProductDownloader {
                 .hasArg(false)
                 .optionalArg(true)
                 .build());
+        options.addOption(Option.builder(Constants.PARAM_FLAG_SEARCH_AWS)
+                .longOpt("aws")
+                .argName("aws")
+                .desc("Perform search directly into AWS (slower but doesn't go through SciHub)")
+                .hasArg(false)
+                .optionalArg(true)
+                .build());
         /*
          * Proxy parameters
          */
@@ -275,7 +282,7 @@ public class S2ProductDownloader {
         }
     }
 
-    public static void main(String[] args) throws IOException, URISyntaxException, ParseException {
+    public static void main(String[] args) throws Exception {
         if (args.length < 3) {
             HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("S2ProductDownload", options);
@@ -348,6 +355,10 @@ public class S2ProductDownloader {
                     commandLine.getOptionValue(Constants.PARAM_PROXY_PASSWORD) :
                     nullIfEmpty(props.getProperty("proxy.pwd", null));
             NetUtils.setProxy(proxyType, proxyHost, proxyPort == null ? 0 : Integer.parseInt(proxyPort), proxyUser, proxyPwd);
+
+            if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS) && !commandLine.hasOption(Constants.PARAM_USER)) {
+                throw new MissingOptionException("Missing SciHub credentials");
+            }
 
             String user = commandLine.getOptionValue(Constants.PARAM_USER);
             String pwd = commandLine.getOptionValue(Constants.PARAM_PASSWORD);
@@ -467,25 +478,45 @@ public class S2ProductDownloader {
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getMaxY());
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getY());
             }
+
             numPoints = areaOfInterest.getNumPoints();
             if (numPoints > 0) {
-                String searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
-                if (!NetUtils.isAvailable(searchUrl)) {
-                    Logger.getRootLogger().error(searchUrl + " is not available!");
-                    searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
+                String searchUrl;
+                AbstractSearch searchProvider;
+                if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS)) {
+                    searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
+                    if (!NetUtils.isAvailable(searchUrl)) {
+                        Logger.getRootLogger().error(searchUrl + " is not available!");
+                        searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
+                    }
+                    searchProvider = new SciHubSearch(searchUrl);
+                    SciHubSearch search = (SciHubSearch) searchProvider;
+                    if (user != null && !user.isEmpty() && pwd != null && !pwd.isEmpty()) {
+                        search = search.auth(user, pwd);
+                    }
+                    String interval = "[" + sensingStart + " TO " + sensingEnd + "]";
+                    search.filter(Constants.SEARCH_PARAM_INTERVAL, interval).limit(limit);
+                    if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
+                        search.filter(Constants.SEARCH_PARAM_RELATIVE_ORBIT_NUMBER, commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT));
+                    }
+                } else {
+                    searchUrl = props.getProperty(Constants.PROPERTY_NAME_AWS_SEARCH_URL, Constants.PROPERTY_DEFAULT_AWS_SEARCH_URL);
+                    searchProvider = new AmazonSearch(searchUrl);
+                    searchProvider.setTiles(tiles);
+                    Calendar calendar = Calendar.getInstance();
+                    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+                    calendar.add(Calendar.DAY_OF_MONTH, Integer.parseInt(sensingStart.replace("NOW", "").replace("DAY", "")));
+                    searchProvider.setSensingStart(dateFormat.format(calendar.getTime()));
+                    calendar = Calendar.getInstance();
+                    calendar.add(Calendar.DAY_OF_MONTH, Integer.parseInt(sensingEnd.replace("NOW", "").replace("DAY", "")));
+                    searchProvider.setSensingEnd(dateFormat.format(calendar.getTime()));
+                    if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
+                        searchProvider.setOrbit(Integer.parseInt(commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT)));
+                    }
                 }
-                ProductSearch search = new ProductSearch(searchUrl);
-                search.setPolygon(areaOfInterest);
-                search.setClouds(clouds);
-                if (!user.isEmpty() && !pwd.isEmpty()) {
-                    search = search.auth(user, pwd);
-                }
-                String interval = "[" + sensingStart + " TO " + sensingEnd + "]";
-                search.filter(Constants.SEARCH_PARAM_INTERVAL, interval).limit(limit);
-                if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
-                    search.filter(Constants.SEARCH_PARAM_RELATIVE_ORBIT_NUMBER, commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT));
-                }
-                products = search.execute();
+                searchProvider.setAreaOfInterest(areaOfInterest);
+                searchProvider.setClouds(clouds);
+                products = searchProvider.execute();
             }
             downloader.setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
             retCode = downloader.downloadProducts(products);

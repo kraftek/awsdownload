@@ -25,7 +25,6 @@ import ro.cs.s2.util.Logger;
 import ro.cs.s2.util.NetUtils;
 
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,65 +34,54 @@ import java.util.List;
  *
  * @author Cosmin Cara
  */
-public class ProductSearch {
+class SciHubSearch extends AbstractSearch {
 
-    private URI url;
     private List<NameValuePair> params;
-    private Polygon2D polygon;
     private String filter;
     //private CredentialsProvider credsProvider;
     private UsernamePasswordCredentials credentials;
-    private double cloudFilter;
 
-    public ProductSearch(String url) throws URISyntaxException {
-        this.url = new URI(url);
+    SciHubSearch(String url) throws URISyntaxException {
+        super(url);
         this.filter = "platformName:Sentinel-2";
         this.params = new ArrayList<>();
     }
 
-    public void setPolygon(Polygon2D polygon) {
-        this.polygon = polygon;
-    }
-
-    public void setClouds(double clouds) {
-        this.cloudFilter = clouds;
-    }
-
-    public ProductSearch filter(String key, String value) {
+    SciHubSearch filter(String key, String value) {
         if (key != null && !key.isEmpty() && value != null && !value.isEmpty()) {
             this.filter += " AND " + key + ":" + value;
         }
         return this;
     }
 
-    public ProductSearch limit(int number) {
+    SciHubSearch limit(int number) {
         if (number > 0) {
             params.add(new BasicNameValuePair("rows", String.valueOf(number)));
         }
         return this;
     }
 
-    public ProductSearch start(int start) {
+    public SciHubSearch start(int start) {
         if (start >= 0) {
             params.add(new BasicNameValuePair("start",String.valueOf(start)));
         }
         return this;
     }
 
-    public ProductSearch auth(String user, String pwd) {
+    SciHubSearch auth(String user, String pwd) {
         this.credentials = new UsernamePasswordCredentials(user, pwd);
         return this;
     }
 
-    public String getQuery() {
+    private String getQuery() {
         params.add(new BasicNameValuePair("q", filter));
         return this.url.toString() + "?" + URLEncodedUtils.format(params, "UTF-8").replace("+", "%20");
     }
 
     public List<ProductDescriptor> execute() throws IOException {
         List<ProductDescriptor> results = new ArrayList<>();
-        if (this.polygon.getNumPoints() > 0) {
-            filter("footprint", "\"Intersects(" + (polygon.getNumPoints() < 200 ? polygon.toWKT() : polygon.toWKTBounds()) + ")\"");
+        if (this.aoi.getNumPoints() > 0) {
+            filter("footprint", "\"Intersects(" + (this.aoi.getNumPoints() < 200 ? this.aoi.toWKT() : this.aoi.toWKTBounds()) + ")\"");
         }
         String queryUrl = getQuery();
         Logger.getRootLogger().info(queryUrl);

@@ -11,6 +11,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
 import java.net.*;
@@ -116,5 +117,23 @@ public class NetUtils {
             e.printStackTrace();
         }
         return response;
+    }
+
+    public static String getResponseAsString(String url) throws IOException {
+        String result = null;
+        try (CloseableHttpResponse yearResponse = NetUtils.openConnection(url, (Credentials) null)) {
+            switch (yearResponse.getStatusLine().getStatusCode()) {
+                case 200:
+                    result = EntityUtils.toString(yearResponse.getEntity());
+                    break;
+                case 401:
+                    Logger.getRootLogger().info("The supplied credentials are invalid!");
+                    break;
+                default:
+                    Logger.getRootLogger().info("The request was not successful. Reason: %s", yearResponse.getStatusLine().getReasonPhrase());
+                    break;
+            }
+        }
+        return result;
     }
 }

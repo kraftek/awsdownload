@@ -110,7 +110,7 @@ public class ProductDownloader {
         productsUrl = baseUrl + "products/";
         ODataPath odp = new ODataPath();
         String scihubUrl = props.getProperty("scihub.product.url", "https://scihub.copernicus.eu/apihub/odata/v1");
-        if (!NetUtils.isAvailable(scihubUrl)) {
+        if (source.equals(ProductStore.SCIHUB) && !NetUtils.isAvailable(scihubUrl)) {
             System.err.println(scihubUrl + " is not available!");
             scihubUrl = props.getProperty("scihub.product.backup.url", "https://scihub.copernicus.eu/dhus/odata/v1");
         }

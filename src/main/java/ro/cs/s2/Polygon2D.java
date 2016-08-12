@@ -28,8 +28,8 @@ import java.util.regex.Pattern;
  * @author Cosmin Cara
  */
 public class Polygon2D {
-    static final Pattern polyPattern = Pattern.compile("POLYGON\\(\\(.*\\)\\)");
-    static final Pattern coordPattern = Pattern.compile("((?:-?(?:\\d+\\.\\d+)) (?:-?(?:\\d+\\.\\d+)))");
+    private static final Pattern polyPattern = Pattern.compile("POLYGON\\(\\(.*\\)\\)");
+    private static final Pattern coordPattern = Pattern.compile("((?:-?(?:\\d+\\.\\d+)) (?:-?(?:\\d+\\.\\d+)))");
 
     private Path2D.Double polygon;
     private int numPoints;
@@ -42,7 +42,7 @@ public class Polygon2D {
      * @param wkt   The text to parse.
      * @return      A closed polygon.
      */
-    public static Polygon2D fromWKT(String wkt) {
+    static Polygon2D fromWKT(String wkt) {
         Polygon2D polygon = new Polygon2D();
         Matcher matcher = polyPattern.matcher(wkt);
         if (matcher.matches()) {
@@ -109,14 +109,14 @@ public class Polygon2D {
      * Returns the number of points of the current polygon.
      *
      */
-    public int getNumPoints() {
+    int getNumPoints() {
         return numPoints;
     }
 
     /**
      * Produces a WKT representation of this polygon.
      */
-    public String toWKT() {
+    String toWKT() {
         StringBuilder buffer = new StringBuilder();
         buffer.append("POLYGON((");
         PathIterator pathIterator = polygon.getPathIterator(null);
@@ -135,7 +135,7 @@ public class Polygon2D {
         return polygon.getBounds2D();
     }
 
-    public String toWKTBounds() {
+    String toWKTBounds() {
         Rectangle2D bounds2D = polygon.getBounds2D();
         return  "POLYGON((" +
                 bounds2D.getMinX() + " " + bounds2D.getMinY() + "," +
