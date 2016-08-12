@@ -28,8 +28,13 @@ Filtering on products is mutually exclusive with filtering on an area of interes
 
 Note: The project requires Java 8 to be installed.
 
-A simple example:
+Example 1 - Download a tile (actually products with only that tile) from AWS, but querying SciHub 
+
     java -jar S2ProductDownloader-1.0.jar --out D:\Products --tiles 34TFQ --startdate 2016-07-12 --relative.orbit 93 --store AWS --cloudpercentage 50 --user <scihub_user> --password <scihub_password>
+
+Example 2 - Download a tile (actually products with only that tile) from AWS without querying SciHub
+
+    java -jar S2ProductDownloader-1.0.jar --out D:\Products --tiles 34TFQ --startdate 2016-07-12 --relative.orbit 93 --store AWS --cloudpercentage 50
 
 #Configuration considerations
 It may be possible that you are behind a proxy. In this case, please either pass the proxy arguments from command line or edit the download.properties file and set them accordingly.
