@@ -508,7 +508,9 @@ public class S2ProductDownloader {
                     calendar.add(Calendar.DAY_OF_MONTH, Integer.parseInt(sensingStart.replace("NOW", "").replace("DAY", "")));
                     searchProvider.setSensingStart(dateFormat.format(calendar.getTime()));
                     calendar = Calendar.getInstance();
-                    calendar.add(Calendar.DAY_OF_MONTH, Integer.parseInt(sensingEnd.replace("NOW", "").replace("DAY", "")));
+                    String endOffset = sensingEnd.replace("NOW", "").replace("DAY", "");
+                    int offset = endOffset.isEmpty() ? 0 : Integer.parseInt(endOffset);
+                    calendar.add(Calendar.DAY_OF_MONTH, offset);
                     searchProvider.setSensingEnd(dateFormat.format(calendar.getTime()));
                     if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
                         searchProvider.setOrbit(Integer.parseInt(commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT)));
