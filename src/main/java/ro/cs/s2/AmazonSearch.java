@@ -46,10 +46,10 @@ class AmazonSearch extends AbstractSearch {
             Calendar endDate = Calendar.getInstance();
             endDate.setTime(dateFormat.parse(this.sensingEnd));
             int yearStart = startDate.get(Calendar.YEAR);
-            int monthStart = startDate.get(Calendar.MONTH);
+            int monthStart = startDate.get(Calendar.MONTH) + 1;
             int dayStart = startDate.get(Calendar.DAY_OF_MONTH);
             int yearEnd = endDate.get(Calendar.YEAR);
-            int monthEnd = endDate.get(Calendar.MONTH);
+            int monthEnd = endDate.get(Calendar.MONTH) + 1;
             int dayEnd = endDate.get(Calendar.DAY_OF_MONTH);
             for (String tile : tiles) {
                 String utmCode = tile.substring(0, 2);
