@@ -15,6 +15,8 @@ import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
 import java.net.*;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Helper class to check availability of a given url.
@@ -60,14 +62,23 @@ public class NetUtils {
     }
 
     public static boolean isAvailable(String url) {
+        boolean status;
         try {
+            Logger.getRootLogger().debug("Verifying url: %s", url);
             HttpURLConnection connection = openConnection(url, authToken);
             connection.setRequestMethod("GET");
             connection.connect();
-            return (200 == connection.getResponseCode() || 400 == connection.getResponseCode());
+            status = (200 == connection.getResponseCode() || 400 == connection.getResponseCode());
+            Logger.getRootLogger().debug("Url status: %s [code %s]", url, connection.getResponseCode());
         } catch (Exception e) {
-            return false;
+            Logger.getRootLogger().debug("Verification failed: %s", e.getMessage());
+            status = false;
         }
+        return status;
+    }
+
+    public static HttpURLConnection openConnection(String url) {
+        return openConnection(url, (String) null);
     }
 
     public static HttpURLConnection openConnection(String url, String authToken) {
@@ -76,8 +87,10 @@ public class NetUtils {
             URL urlObj = new URL(url);
             if (javaNetProxy == null) {
                 connection = (HttpURLConnection) urlObj.openConnection();
+                Logger.getRootLogger().debug("Proxyless connection to %s opened", url);
             } else {
                 connection = (HttpURLConnection) urlObj.openConnection(javaNetProxy);
+                Logger.getRootLogger().debug("Proxy connection to %s opened", url);
             }
             if (authToken != null) {
                 connection.setRequestProperty("Authorization", authToken);
@@ -85,7 +98,21 @@ public class NetUtils {
             connection.setConnectTimeout(timeout);
             connection.setReadTimeout(timeout);
         } catch (IOException e) {
-            e.printStackTrace();
+            Logger.getRootLogger().debug("Could not open connection to %s [%s]", url, e.getMessage());
+        }
+        if (connection != null) {
+            StringBuilder builder = new StringBuilder();
+            Map<String, List<String>> requestProperties = connection.getRequestProperties();
+            for (Map.Entry<String, List<String>> entry : requestProperties.entrySet()) {
+                builder.append(entry.getKey()).append("=");
+                for (String value : entry.getValue()) {
+                    builder.append(value).append(",");
+                }
+                builder.append(";");
+            }
+            if (builder.length() > 0) {
+                Logger.getRootLogger().debug("Request details: %s", builder.toString());
+            }
         }
         return connection;
     }
@@ -112,9 +139,15 @@ public class NetUtils {
                 RequestConfig config = RequestConfig.custom().setProxy(apacheHttpProxy).build();
                 get.setConfig(config);
             }
+            Logger.getRootLogger().debug("HTTP GET %s", url);
+            RequestConfig config = get.getConfig();
+            if (config != null) {
+                Logger.getRootLogger().debug("Details: %s", config.toString());
+            }
             response = httpClient.execute(get);
+            Logger.getRootLogger().debug("HTTP GET %s returned %s", url, response.getStatusLine().getStatusCode());
         } catch (URISyntaxException | IOException e) {
-            e.printStackTrace();
+            Logger.getRootLogger().debug("Could not create connection to %s : %s", url, e.getMessage());
         }
         return response;
     }

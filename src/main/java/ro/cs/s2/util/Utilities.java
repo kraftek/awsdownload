@@ -90,12 +90,16 @@ public class Utilities {
         return folder;
     }
 
-    public static Path ensurePermissions(Path file) throws IOException {
-        if (file != null && Files.exists(file)) {
-            if (isPosixFileSystem()) {
-                Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
-                file = Files.setPosixFilePermissions(file, perms);
+    public static Path ensurePermissions(Path file) {
+        try {
+            if (file != null && Files.exists(file)) {
+                if (isPosixFileSystem()) {
+                    Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
+                    file = Files.setPosixFilePermissions(file, perms);
+                }
             }
+        } catch (IOException ex) {
+            Logger.getRootLogger().warn("Cannot set permissions for %s", file.toString());
         }
         return file;
     }

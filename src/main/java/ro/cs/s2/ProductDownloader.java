@@ -28,7 +28,6 @@ import javax.json.JsonObject;
 import javax.json.JsonReader;
 import java.io.*;
 import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,7 +41,7 @@ import java.util.regex.Pattern;
  *
  * @author Cosmin Cara
  */
-public class ProductDownloader {
+class ProductDownloader {
     private static final String prefix = "S2A_OPER_PRD_MSIL1C_PDMC_";
     private static final String tilePrefix = "S2A_OPER_MSI_L1C_TL_MTI__";
     private static final String auxPrefix = "S2A_OPER_AUX_ECMWFT_MTI__";
@@ -91,7 +90,7 @@ public class ProductDownloader {
 
     private Logger.ScopeLogger productLogger;
 
-    public ProductDownloader(ProductStore source, String targetFolder) {
+    ProductDownloader(ProductStore source, String targetFolder) {
         this.store = source;
         this.destination = targetFolder;
         Properties props = new Properties();
@@ -122,11 +121,11 @@ public class ProductDownloader {
         fillMissingAnglesMethod = FillAnglesMethod.NONE;
     }
 
-    public void setDownloadStore(ProductStore store) {
+    void setDownloadStore(ProductStore store) {
         this.store = store;
     }
 
-    public void setFilteredTiles(Set<String> tiles, boolean unpacked) {
+    void setFilteredTiles(Set<String> tiles, boolean unpacked) {
         this.filteredTiles = tiles;
         if (shouldFilterTiles = (tiles != null && tiles.size() > 0) || unpacked) {
             StringBuilder text = new StringBuilder();
@@ -144,19 +143,19 @@ public class ProductDownloader {
         }
     }
 
-    public void shouldCompress(boolean shouldCompress) {
+    void shouldCompress(boolean shouldCompress) {
         this.shouldCompress = shouldCompress;
     }
 
-    public void shouldDeleteAfterCompression(boolean shouldDeleteAfterCompression) {
+    void shouldDeleteAfterCompression(boolean shouldDeleteAfterCompression) {
         this.shouldDeleteAfterCompression = shouldDeleteAfterCompression;
     }
 
-    public void setFillMissingAnglesMethod(FillAnglesMethod value) {
+    void setFillMissingAnglesMethod(FillAnglesMethod value) {
         this.fillMissingAnglesMethod = value;
     }
 
-    public int downloadProducts(List<ProductDescriptor> products){
+    int downloadProducts(List<ProductDescriptor> products){
         int retCode = ReturnCode.OK;
         if (products != null) {
             int productCounter = 1, productCount = products.size();
@@ -195,7 +194,7 @@ public class ProductDownloader {
         return retCode;
     }
 
-    public Path download(ProductDescriptor product) throws IOException {
+    private Path download(ProductDescriptor product) throws IOException {
         switch (store) {
             case AWS:
                 return downloadFromAWS(product);
@@ -349,11 +348,12 @@ public class ProductDownloader {
             url = baseProductUrl + "metadata.xml";
             Path metadataFile = rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
             currentStep = "Metadata";
-            downloadFile(url, metadataFile);
+            getLogger().debug("Downloading metadata file %s", metadataFile);
+            metadataFile = downloadFile(url, metadataFile);
             Path inspireFile = metadataFile.resolveSibling("INSPIRE.xml");
             Path manifestFile = metadataFile.resolveSibling("manifest.safe");
             Path previewFile = metadataFile.resolveSibling("preview.png");
-            if (Files.exists(metadataFile)) {
+            if (metadataFile != null && Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
                 List<String> metaTileNames = Utilities.filter(allLines, "<Granules");
                 boolean hasTiles = updateMedatata(metadataFile, allLines);
@@ -378,12 +378,16 @@ public class ProductDownloader {
                     Utilities.ensureExists(rootPath.resolve("AUX_DATA"));
                     Path dataStripFolder = Utilities.ensureExists(rootPath.resolve("DATASTRIP"));
                     String productJsonUrl = baseProductUrl + "productInfo.json";
-                    URL jsonUrl = new URL(productJsonUrl);
+                    HttpURLConnection connection = null;
                     InputStream inputStream = null;
                     JsonReader reader = null;
                     try {
-                        inputStream = jsonUrl.openStream();
+
+                        getLogger().debug("Downloading json product descriptor %s", productJsonUrl);
+                        connection = NetUtils.openConnection(productJsonUrl);
+                        inputStream = connection.getInputStream();
                         reader = Json.createReader(inputStream);
+                        getLogger().debug("Parsing json descriptor %s", productJsonUrl);
                         JsonObject obj = reader.readObject();
                         final Map<String, String> tileNames = getTileNames(obj, metaTileNames);
                         String dataStripId = null;
@@ -399,13 +403,17 @@ public class ProductDownloader {
                             Path qiData = Utilities.ensureExists(tileFolder.resolve("QI_DATA"));
                             String refName = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
                             String metadataName = refName.replace("MSI", "MTD");
+                            getLogger().debug("Downloading tile metadata %s", tileFolder.resolve(metadataName + ".xml"));
                             Path tileMetaFile = downloadFile(tileUrl + "/metadata.xml", tileFolder.resolve(metadataName + ".xml"));
                             List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
                             for (String bandFileName : bandFiles) {
                                 try {
-                                    downloadFile(tileUrl + URL_SEPARATOR + bandFileName, imgData.resolve(refName + NAME_SEPARATOR + bandFileName));
+                                    String bandFileUrl = tileUrl + URL_SEPARATOR + bandFileName;
+                                    Path path = imgData.resolve(refName + NAME_SEPARATOR + bandFileName);
+                                    getLogger().debug("Downloading band raster %s from %s", path, bandFileName);
+                                    downloadFile(bandFileUrl, path);
                                 } catch (IOException ex) {
-                                    getLogger().warn("Download failed: " + bandFileName);
+                                    getLogger().warn("Download for %s failed [%s]", bandFileName, ex.getMessage());
                                 }
                             }
                             List<String> lines = Utilities.filter(tileMetadataLines, "<MASK_FILENAME");
@@ -416,37 +424,48 @@ public class ProductDownloader {
                                 String maskFileName = line.substring(firstTagCloseIdx, secondTagBeginIdx);
                                 String[] tokens = maskFileName.split(NAME_SEPARATOR);
                                 String remoteName = tokens[2] + NAME_SEPARATOR + tokens[3] + NAME_SEPARATOR + tokens[9] + ".gml";
+                                Path path = qiData.resolve(maskFileName);
                                 try {
-                                    downloadFile(tileUrl + "/qi/" + remoteName, qiData.resolve(maskFileName));
+                                    String fileUrl = tileUrl + "/qi/" + remoteName;
+                                    getLogger().debug("Downloading file %s from %s", path, fileUrl);
+                                    downloadFile(fileUrl, path);
                                 } catch (IOException ex) {
-                                    getLogger().warn("Download failed: " + remoteName);
+                                    getLogger().warn("Download for %s failed [%s]", path, ex.getMessage());
                                 }
                             }
+                            getLogger().debug("Trying to download %s", tileUrl + "/auxiliary/ECMWFT");
                             downloadFile(tileUrl + "/auxiliary/ECMWFT", auxData.resolve(refName.replace(tilePrefix, auxPrefix)));
                             if (dataStripId == null) {
                                 String tileJson = tileUrl + "/tileInfo.json";
-                                URL tileJsonUrl = new URL(tileJson);
+                                //URL tileJsonUrl = new URL(tileJson);
+                                HttpURLConnection tileConnection = null;
                                 InputStream is = null;
                                 JsonReader tiReader = null;
                                 try {
-                                    is = tileJsonUrl.openStream();
+                                    getLogger().debug("Downloading json tile descriptor %s", tileJson);
+                                    tileConnection = NetUtils.openConnection(tileJson);
+                                    is = tileConnection.getInputStream();
                                     tiReader = Json.createReader(is);
+                                    getLogger().debug("Parsing json tile descriptor %s", tileJson);
                                     JsonObject tileObj = tiReader.readObject();
                                     dataStripId = tileObj.getJsonObject("datastrip").getString("id");
                                     String dataStripPath = tileObj.getJsonObject("datastrip").getString("path") + "/metadata.xml";
                                     Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(dataStripId));
                                     Utilities.ensureExists(dataStripFolder.resolve("QI_DATE"));
                                     String dataStripFile = dataStripId.substring(0, dataStripId.lastIndexOf(NAME_SEPARATOR)).replace("MSI", "MTD") + ".xml";
+                                    getLogger().debug("Downloading %s", baseUrl + dataStripPath);
                                     downloadFile(baseUrl + dataStripPath, dataStrip.resolve(dataStripFile));
                                 } finally {
                                     if (tiReader != null) tiReader.close();
                                     if (is != null) is.close();
+                                    if (tileConnection != null) tileConnection.disconnect();
                                 }
                             }
                         }
                     } finally {
                         if (reader != null) reader.close();
                         if (inputStream != null) inputStream.close();
+                        if (connection != null) connection.disconnect();
                     }
                 } else {
                     Files.deleteIfExists(metadataFile);
@@ -455,7 +474,7 @@ public class ProductDownloader {
                     getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
                 }
             } else {
-                getLogger().warn("The product %s was not found in %s data bucket", productName, store);
+                getLogger().warn("Either the product %s was not found in %s data bucket or the metadata file could not be downloaded", productName, store);
                 rootPath = null;
             }
         }
@@ -505,32 +524,43 @@ public class ProductDownloader {
         HttpURLConnection connection = null;
         Path tmpFile = null;
         try {
+            Logger.getRootLogger().debug("Begin download for %s", remoteUrl);
             connection = NetUtils.openConnection(remoteUrl, store == ProductStore.SCIHUB ? NetUtils.getAuthToken() : null);
-            if (!Files.exists(file)) {
-                long remoteFileLength = connection.getContentLengthLong();
+            long remoteFileLength = connection.getContentLengthLong();
+            long localFileLength = 0;
+            if (!Files.exists(file) || remoteFileLength != (localFileLength = Files.size(file))) {
+                if (remoteFileLength != localFileLength) {
+                    Logger.getRootLogger().debug("Remote file size: %s. Local file size: %s. File will be downloaded again.", remoteFileLength, localFileLength);
+                }
                 int kBytes = (int) (remoteFileLength / 1024);
                 getLogger().info(startMessage, currentProduct, currentStep, file.getFileName(), kBytes);
                 InputStream inputStream = null;
                 OutputStream outputStream = null;
                 try {
                     tmpFile = Files.createTempFile(file.getParent(), "tmp", null);
+                    Logger.getRootLogger().debug("Local temporary file %s created", tmpFile.toString());
                     long start = System.currentTimeMillis();
                     inputStream = connection.getInputStream();
                     outputStream = Files.newOutputStream(tmpFile);
                     byte[] buffer = new byte[BUFFER_SIZE];
                     int read;
+                    Logger.getRootLogger().debug("Begin reading from input stream");
                     while ((read = inputStream.read(buffer)) != -1) {
                         outputStream.write(buffer, 0, read);
                         outputStream.flush();
                         Thread.yield();
                     }
+                    Logger.getRootLogger().debug("End reading from input stream");
+                    Files.deleteIfExists(file);
                     Files.move(tmpFile, file);
                     getLogger().info(completeMessage, currentProduct, currentStep, file.getFileName(), (System.currentTimeMillis() - start) / 1000);
                 } finally {
                     if (outputStream != null) outputStream.close();
                     if (inputStream != null) inputStream.close();
                 }
+                Logger.getRootLogger().debug("End download for %s", remoteUrl);
             } else {
+                Logger.getRootLogger().debug("File already downloaded");
                 getLogger().info(completeMessage, currentProduct, currentStep, file.getFileName(), 0);
             }
         } catch (FileNotFoundException fnex) {
@@ -594,26 +624,26 @@ public class ProductDownloader {
     private class ODataPath {
         private StringBuilder buffer;
 
-        public ODataPath() {
+        ODataPath() {
             buffer = new StringBuilder();
         }
 
-        public ODataPath root(String path) {
+        ODataPath root(String path) {
             buffer.setLength(0);
             buffer.append(path);
             return this;
         }
 
-        public ODataPath node(String nodeName) {
+        ODataPath node(String nodeName) {
             buffer.append("/Nodes('").append(nodeName).append("')");
             return this;
         }
 
-        public String path() {
+        String path() {
             return buffer.toString();
         }
 
-        public String value() {
+        String value() {
             return buffer.toString() + "/$value";
         }
     }

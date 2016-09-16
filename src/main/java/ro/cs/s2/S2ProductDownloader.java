@@ -237,6 +237,13 @@ public class S2ProductDownloader {
                 .hasArg(false)
                 .optionalArg(true)
                 .build());
+        options.addOption(Option.builder(Constants.PARAM_VERBOSE)
+                .longOpt("verbose")
+                .argName("verbose")
+                .desc("Produces verbose output/logs")
+                .hasArg(false)
+                .optionalArg(true)
+                .build());
         /*
          * Proxy parameters
          */
@@ -293,14 +300,12 @@ public class S2ProductDownloader {
         CommandLine commandLine = parser.parse(options, args);
         String logFile = props.getProperty("master.log.file");
         String folder;
+        boolean debugMode = commandLine.hasOption(Constants.PARAM_VERBOSE);
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
             folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));
-            Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString());
-            Logger.getRootLogger().info("Executing with the following arguments:");
-            for (Option option : commandLine.getOptions()) {
-                Logger.getRootLogger().info(option.getOpt() + "=" + option.getValue());
-            }
+            Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString(), debugMode);
+            printCommandLine(commandLine);
             String rootFolder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             FillAnglesMethod fillAnglesMethod = Enum.valueOf(FillAnglesMethod.class,
                     commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
@@ -329,11 +334,8 @@ public class S2ProductDownloader {
         } else {
             folder = commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));
-            Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString());
-            Logger.getRootLogger().info("Executing with the following arguments:");
-            for (Option option : commandLine.getOptions()) {
-                Logger.getRootLogger().info(option.getOpt() + "=" + option.getValue());
-            }
+            Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString(), debugMode);
+            printCommandLine(commandLine);
             List<ProductDescriptor> products = new ArrayList<>();
             Set<String> tiles = new HashSet<>();
             Polygon2D areaOfInterest = new Polygon2D();
@@ -386,9 +388,9 @@ public class S2ProductDownloader {
                 }
             } else {
                 BufferedReader reader =
-                             new BufferedReader(
-                                     new InputStreamReader(
-                                             S2ProductDownloader.class.getResourceAsStream("tilemap.dat")));
+                        new BufferedReader(
+                                new InputStreamReader(
+                                        S2ProductDownloader.class.getResourceAsStream("tilemap.dat")));
                 Logger.getRootLogger().info("Loading S2 tiles extents");
                 TilesMap.read(reader);
                 Logger.getRootLogger().info(String.valueOf(TilesMap.getCount() + " tile extents loaded"));
@@ -524,6 +526,19 @@ public class S2ProductDownloader {
             retCode = downloader.downloadProducts(products);
         }
         System.exit(retCode);
+    }
+
+    private static void printCommandLine(CommandLine cmd) {
+        Logger.getRootLogger().info("Executing with the following arguments:");
+        for (Option option : cmd.getOptions()) {
+            if (option.hasArgs()) {
+                Logger.getRootLogger().info(option.getOpt() + "=" + String.join(" ", option.getValues()));
+            } else if (option.hasArg()) {
+                Logger.getRootLogger().info(option.getOpt() + "=" + option.getValue());
+            } else {
+                Logger.getRootLogger().info(option.getOpt());
+            }
+        }
     }
 
     private static String nullIfEmpty(String string) {
