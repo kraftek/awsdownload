@@ -181,7 +181,9 @@ public class MetadataRepairer {
         }
 
         if(gridUpdated && meansUpdated) {
-            Files.copy(metaFile, Paths.get(metaFile.toAbsolutePath().toString() + ".bkp"));
+            Path backup = Paths.get(metaFile.toAbsolutePath().toString() + ".bkp");
+            Files.deleteIfExists(backup);
+            Files.copy(metaFile, backup);
             Files.write(metaFile, originalLines, StandardCharsets.UTF_8);
         }
 

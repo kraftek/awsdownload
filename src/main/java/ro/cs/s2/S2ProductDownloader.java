@@ -160,7 +160,7 @@ public class S2ProductDownloader {
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
                 .longOpt("cloudpercentage")
                 .argName("number between 0 and 100")
-                .desc("The threshold for cloud coverage of the products. Below this threshold, the products will be ignored. Default is 30.")
+                .desc("The threshold for cloud coverage of the products. Above this threshold, the products will be ignored. Default is 100.")
                 .hasArg()
                 .optionalArg(true)
                 .build());
@@ -472,7 +472,7 @@ public class S2ProductDownloader {
             }
 
             int numPoints = areaOfInterest.getNumPoints();
-            if (numPoints == 0 && TilesMap.getCount() > 0) {
+            if (products.size() == 0 && numPoints == 0 && TilesMap.getCount() > 0) {
                 Rectangle2D rectangle2D = TilesMap.boundingBox(commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getY());
                 areaOfInterest.append(rectangle2D.getMaxX(), rectangle2D.getY());
@@ -482,13 +482,15 @@ public class S2ProductDownloader {
             }
 
             numPoints = areaOfInterest.getNumPoints();
-            if (numPoints > 0) {
+            if (products.size() == 0 && numPoints > 0) {
                 String searchUrl;
                 AbstractSearch searchProvider;
+                Logger.getRootLogger().debug("No product provider, searching on the AOI");
                 if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS)) {
+                    Logger.getRootLogger().debug("Search will be done on SciHub");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
                     if (!NetUtils.isAvailable(searchUrl)) {
-                        Logger.getRootLogger().error(searchUrl + " is not available!");
+                        Logger.getRootLogger().warn(searchUrl + " is not available!");
                         searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
                     }
                     searchProvider = new SciHubSearch(searchUrl);
@@ -502,6 +504,7 @@ public class S2ProductDownloader {
                         search.filter(Constants.SEARCH_PARAM_RELATIVE_ORBIT_NUMBER, commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT));
                     }
                 } else {
+                    Logger.getRootLogger().debug("Search will be done on AWS");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_AWS_SEARCH_URL, Constants.PROPERTY_DEFAULT_AWS_SEARCH_URL);
                     searchProvider = new AmazonSearch(searchUrl);
                     searchProvider.setTiles(tiles);
@@ -521,6 +524,8 @@ public class S2ProductDownloader {
                 searchProvider.setAreaOfInterest(areaOfInterest);
                 searchProvider.setClouds(clouds);
                 products = searchProvider.execute();
+            } else {
+                Logger.getRootLogger().debug("Product name(s) present, no additional search will be performed.");
             }
             downloader.setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
             retCode = downloader.downloadProducts(products);

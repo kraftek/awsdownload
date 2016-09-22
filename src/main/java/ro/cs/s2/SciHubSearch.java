@@ -54,6 +54,24 @@ class SciHubSearch extends AbstractSearch {
         return this;
     }
 
+    SciHubSearch filter(List<String> productNames) {
+        if (productNames != null) {
+            String list = "(";
+            boolean more = productNames.size() > 1;
+            for (String productName : productNames) {
+                list += productName;
+                if (more) {
+                    list += " OR ";
+                }
+            }
+            if (more) {
+                list = list.substring(0, list.length() - 4) + ")";
+            }
+            this.filter += " AND " + list;
+        }
+        return this;
+    }
+
     SciHubSearch limit(int number) {
         if (number > 0) {
             params.add(new BasicNameValuePair("rows", String.valueOf(number)));

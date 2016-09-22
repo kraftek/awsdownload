@@ -24,11 +24,17 @@ public class ProductDescriptor {
     private String name;
     private String id;
     private double cloudsPercentage;
+    private String sensingDate;
 
     public ProductDescriptor() {}
 
     public ProductDescriptor(String name) {
         this.name = name;
+        String[] tokens = this.name.split("_");
+        if (tokens.length != 9) {
+            throw new IllegalArgumentException(String.format("The product name %s doesn't match the expected pattern", name));
+        }
+        this.sensingDate = tokens[7].substring(1, tokens[7].indexOf("T"));
     }
 
     public String getName() {
@@ -54,6 +60,8 @@ public class ProductDescriptor {
     public void setCloudsPercentage(double cloudsPercentage) {
         this.cloudsPercentage = cloudsPercentage;
     }
+
+    public String getSensingDate() { return sensingDate; }
 
     @Override
     public String toString() {
