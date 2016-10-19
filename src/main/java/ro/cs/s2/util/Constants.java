@@ -27,6 +27,7 @@ public class Constants {
     public static final String PARAM_FLAG_SEARCH_AWS = "aws";
     public static final String PARAM_USER = "user";
     public static final String PARAM_PASSWORD = "pwd";
+    public static final String SENSOR = "sen";
     public static final double DEFAULT_CLOUD_PERCENTAGE = 100.0;
     public static final String DEFAULT_START_DATE = "NOW-7DAY";
     public static final String PATTERN_START_DATE = "NOW-%sDAY";

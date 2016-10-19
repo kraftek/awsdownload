@@ -5,11 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>groupId</groupId>
-    <artifactId>S2ProductDownloader</artifactId>
-    <version>1.0</version>
+    <artifactId>ProductDownload</artifactId>
+    <version>1.1</version>
     <packaging>jar</packaging>
 
-    <name>s2-downloader</name>
+    <name>s2l8-downloader</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -67,6 +67,7 @@
     </dependencies>
 
     <build>
+        <finalName>ProductDownload</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -86,7 +87,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>ro.cs.s2.S2ProductDownloader</mainClass>
+                            <mainClass>ro.cs.s2.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

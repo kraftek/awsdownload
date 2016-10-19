@@ -38,14 +38,16 @@ import java.util.*;
  *
  * @author Cosmin Cara
  */
-public class S2ProductDownloader {
+public class Main {
 
     private static Options options;
     private static Properties props;
+    private static String version;
 
     static {
         options = new Options();
 
+        /* Target folder */
         Option outFolder = Option.builder(Constants.PARAM_OUT_FOLDER)
                 .longOpt("out")
                 .argName("output.folder")
@@ -53,6 +55,7 @@ public class S2ProductDownloader {
                 .hasArg()
                 .required()
                 .build();
+        /* Input folder for offline angles correction */
         Option inFolder = Option.builder(Constants.PARAM_INPUT_FOLDER)
                 .longOpt("input")
                 .argName("input.folder")
@@ -65,6 +68,7 @@ public class S2ProductDownloader {
         folderGroup.addOption(inFolder);
         options.addOptionGroup(folderGroup);
 
+        /* Area of interest */
         Option optionArea = Option.builder(Constants.PARAM_AREA)
                 .longOpt("area")
                 .argName("lon1,lat1 lon2,lat2 ...")
@@ -73,6 +77,7 @@ public class S2ProductDownloader {
                 .optionalArg(true)
                 .valueSeparator(' ')
                 .build();
+        /* File containing the area of interest */
         Option optionAreaFile = Option.builder(Constants.PARAM_AREA_FILE)
                 .longOpt("areafile")
                 .argName("aoi.file")
@@ -80,6 +85,7 @@ public class S2ProductDownloader {
                 .hasArg()
                 .optionalArg(true)
                 .build();
+        /* file containing the Sentinel-2 tile extents */
         Option optionTileShapeFile = Option.builder(Constants.PARAM_TILE_SHAPE_FILE)
                 .longOpt("shapetiles")
                 .argName("tile.shapes.file")
@@ -93,6 +99,7 @@ public class S2ProductDownloader {
         areaGroup.addOption(optionTileShapeFile);
         options.addOptionGroup(areaGroup);
 
+        /* List of S2 tiles */
         Option optionTileList = Option.builder(Constants.PARAM_TILE_LIST)
                 .longOpt("tiles")
                 .argName("tileId1 tileId2 ...")
@@ -101,6 +108,7 @@ public class S2ProductDownloader {
                 .optionalArg(true)
                 .valueSeparator(' ')
                 .build();
+        /* File containing the list of S2 tiles */
         Option optionTileFile = Option.builder(Constants.PARAM_TILE_LIST_FILE)
                 .longOpt("tilefile")
                 .argName("tile.file")
@@ -113,18 +121,20 @@ public class S2ProductDownloader {
         tileGroup.addOption(optionTileFile);
         options.addOptionGroup(tileGroup);
 
+        /* Product names */
         Option optionProductList = Option.builder(Constants.PARAM_PRODUCT_LIST)
                 .longOpt("products")
                 .argName("product1 product2 ...")
-                .desc("A list of S2 product names, space-separated")
+                .desc("A list of S2/L8 product names, space-separated")
                 .hasArgs()
                 .optionalArg(true)
                 .valueSeparator(' ')
                 .build();
+        /* File containing the product names */
         Option optionProductFile = Option.builder(Constants.PARAM_PRODUCT_LIST_FILE)
                 .longOpt("productfile")
                 .argName("product.file")
-                .desc("A file containing a list of S2 products, one product name per line")
+                .desc("A file containing a list of S2/L8 products, one product name per line")
                 .hasArg()
                 .optionalArg(true)
                 .build();
@@ -132,7 +142,7 @@ public class S2ProductDownloader {
         productGroup.addOption(optionProductList);
         productGroup.addOption(optionProductFile);
         options.addOptionGroup(productGroup);
-
+        /* S2 products UUIDs */
         options.addOption(Option.builder(Constants.PARAM_PRODUCT_UUID_LIST)
                 .longOpt("uuid")
                 .argName("uuid1 uui2 ...")
@@ -141,7 +151,7 @@ public class S2ProductDownloader {
                 .optionalArg(true)
                 .valueSeparator(' ')
                 .build());
-
+        /* SciHub user */
         options.addOption(Option.builder(Constants.PARAM_USER)
                 .longOpt("user")
                 .argName("user")
@@ -149,6 +159,7 @@ public class S2ProductDownloader {
                 .hasArg(true)
                 .required(false)
                 .build());
+        /* SciHub password */
         options.addOption(Option.builder(Constants.PARAM_PASSWORD)
                 .longOpt("password")
                 .argName("password")
@@ -156,7 +167,15 @@ public class S2ProductDownloader {
                 .hasArg(true)
                 .required(false)
                 .build());
-
+        /* Sensor/product type */
+        options.addOption(Option.builder(Constants.SENSOR)
+                .longOpt("sensor")
+                .argName("enum")
+                .desc("S2|L8")
+                .hasArg(true)
+                .required(false)
+                .build());
+        /* Cloud coverage percentage */
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
                 .longOpt("cloudpercentage")
                 .argName("number between 0 and 100")
@@ -164,6 +183,7 @@ public class S2ProductDownloader {
                 .hasArg()
                 .optionalArg(true)
                 .build());
+        /* Start date */
         options.addOption(Option.builder(Constants.PARAM_START_DATE)
                 .longOpt("startdate")
                 .argName("yyyy-MM-dd")
@@ -171,6 +191,7 @@ public class S2ProductDownloader {
                 .hasArg()
                 .optionalArg(true)
                 .build());
+        /* End date */
         options.addOption(Option.builder(Constants.PARAM_END_DATE)
                 .longOpt("enddate")
                 .argName("yyyy-MM-dd")
@@ -178,6 +199,7 @@ public class S2ProductDownloader {
                 .hasArg()
                 .optionalArg(true)
                 .build());
+        /* Max number of returned query results */
         options.addOption(Option.builder(Constants.PARAM_RESULTS_LIMIT)
                 .longOpt("limit")
                 .argName("integer greater than 1")
@@ -185,6 +207,7 @@ public class S2ProductDownloader {
                 .hasArg()
                 .optionalArg(true)
                 .build());
+        /* Download store */
         options.addOption(Option.builder(Constants.PARAM_DOWNLOAD_STORE)
                 .longOpt("store")
                 .argName("AWS|SCIHUB")
@@ -192,6 +215,7 @@ public class S2ProductDownloader {
                 .hasArg(true)
                 .optionalArg(true)
                 .build());
+        /* Relative orbit number */
         options.addOption(Option.builder(Constants.PARAM_RELATIVE_ORBIT)
                 .longOpt("relative.orbit")
                 .argName("integer")
@@ -199,6 +223,7 @@ public class S2ProductDownloader {
                 .hasArg(true)
                 .optionalArg(true)
                 .build());
+        /* Missing angles compensation method */
         options.addOption(Option.builder(Constants.PARAM_FILL_ANGLES)
                 .longOpt("ma")
                 .argName("NONE|NAN|INTERPOLATE")
@@ -209,6 +234,7 @@ public class S2ProductDownloader {
         /*
          * Flag parameters
          */
+        /* Compression of downloads */
         options.addOption(Option.builder(Constants.PARAM_FLAG_COMPRESS)
                 .longOpt("zip")
                 .argName("zip")
@@ -216,6 +242,7 @@ public class S2ProductDownloader {
                 .hasArg(false)
                 .optionalArg(true)
                 .build());
+        /* Deletion of files after compression */
         options.addOption(Option.builder(Constants.PARAM_FLAG_DELETE)
                 .longOpt("delete")
                 .argName("delete")
@@ -223,6 +250,7 @@ public class S2ProductDownloader {
                 .hasArg(false)
                 .optionalArg(true)
                 .build());
+        /* Uncompressed files download from SciHub */
         options.addOption(Option.builder(Constants.PARAM_FLAG_UNPACKED)
                 .longOpt("unpacked")
                 .argName("unpacked")
@@ -230,6 +258,7 @@ public class S2ProductDownloader {
                 .hasArg(false)
                 .optionalArg(true)
                 .build());
+        /* Searching AWS instead of SciHub */
         options.addOption(Option.builder(Constants.PARAM_FLAG_SEARCH_AWS)
                 .longOpt("aws")
                 .argName("aws")
@@ -237,6 +266,7 @@ public class S2ProductDownloader {
                 .hasArg(false)
                 .optionalArg(true)
                 .build());
+        /* Verbose logging/output */
         options.addOption(Option.builder(Constants.PARAM_VERBOSE)
                 .longOpt("verbose")
                 .argName("verbose")
@@ -284,7 +314,8 @@ public class S2ProductDownloader {
                 .build());
         props = new Properties();
         try {
-            props.load(S2ProductDownloader.class.getResourceAsStream("download.properties"));
+            props.load(Main.class.getResourceAsStream("download.properties"));
+            version = props.getProperty("version");
         } catch (IOException ignored) {
         }
     }
@@ -292,7 +323,7 @@ public class S2ProductDownloader {
     public static void main(String[] args) throws Exception {
         if (args.length < 3) {
             HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("S2ProductDownload", options);
+            formatter.printHelp("ProductDownload-" + version, options);
             System.exit(0);
         }
         int retCode = ReturnCode.OK;
@@ -336,10 +367,6 @@ public class S2ProductDownloader {
             Utilities.ensureExists(Paths.get(folder));
             Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString(), debugMode);
             printCommandLine(commandLine);
-            List<ProductDescriptor> products = new ArrayList<>();
-            Set<String> tiles = new HashSet<>();
-            Polygon2D areaOfInterest = new Polygon2D();
-            ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE, ProductStore.SCIHUB.toString()));
 
             String proxyType = commandLine.hasOption(Constants.PARAM_PROXY_TYPE) ?
                     commandLine.getOptionValue(Constants.PARAM_PROXY_TYPE) :
@@ -358,7 +385,14 @@ public class S2ProductDownloader {
                     nullIfEmpty(props.getProperty("proxy.pwd", null));
             NetUtils.setProxy(proxyType, proxyHost, proxyPort == null ? 0 : Integer.parseInt(proxyPort), proxyUser, proxyPwd);
 
-            if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS) && !commandLine.hasOption(Constants.PARAM_USER)) {
+            List<ProductDescriptor> products = new ArrayList<>();
+            Set<String> tiles = new HashSet<>();
+            Polygon2D areaOfInterest = new Polygon2D();
+
+            SensorType sensorType = Enum.valueOf(SensorType.class, commandLine.getOptionValue(Constants.SENSOR));
+            ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE, ProductStore.SCIHUB.toString()));
+
+            if (sensorType == SensorType.S2 && !commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS) && !commandLine.hasOption(Constants.PARAM_USER)) {
                 throw new MissingOptionException("Missing SciHub credentials");
             }
 
@@ -369,33 +403,36 @@ public class S2ProductDownloader {
                 NetUtils.setAuthToken(authToken);
             }
 
-            ProductDownloader downloader = new ProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER));
+            ProductDownloader downloader = sensorType.equals(SensorType.S2) ?
+                    new SentinelProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER)) :
+                    new LandsatProductDownloader(commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER));
 
-            if (commandLine.hasOption(Constants.PARAM_AREA)) {
-                String[] points = commandLine.getOptionValues(Constants.PARAM_AREA);
-                for (String point : points) {
-                    areaOfInterest.append(Double.parseDouble(point.substring(0, point.indexOf(","))),
-                            Double.parseDouble(point.substring(point.indexOf(",") + 1)));
+            if (sensorType == SensorType.S2) {
+                if (commandLine.hasOption(Constants.PARAM_AREA)) {
+                    String[] points = commandLine.getOptionValues(Constants.PARAM_AREA);
+                    for (String point : points) {
+                        areaOfInterest.append(Double.parseDouble(point.substring(0, point.indexOf(","))),
+                                Double.parseDouble(point.substring(point.indexOf(",") + 1)));
+                    }
+                } else if (commandLine.hasOption(Constants.PARAM_AREA_FILE)) {
+                    areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue(Constants.PARAM_AREA_FILE))), StandardCharsets.UTF_8));
+                } else if (commandLine.hasOption(Constants.PARAM_TILE_SHAPE_FILE)) {
+                    String tileShapeFile = commandLine.getOptionValue(Constants.PARAM_TILE_SHAPE_FILE);
+                    if (Files.exists(Paths.get(tileShapeFile))) {
+                        Logger.getRootLogger().info("Reading S2 tiles extents");
+                        TilesMap.fromKmlFile(tileShapeFile);
+                        Logger.getRootLogger().info(String.valueOf(TilesMap.getCount() + " tiles found"));
+                    }
+                } else {
+                    BufferedReader reader =
+                            new BufferedReader(
+                                    new InputStreamReader(
+                                            Main.class.getResourceAsStream("tilemap.dat")));
+                    Logger.getRootLogger().info("Loading S2 tiles extents");
+                    TilesMap.read(reader);
+                    Logger.getRootLogger().info(String.valueOf(TilesMap.getCount() + " tile extents loaded"));
                 }
-            } else if (commandLine.hasOption(Constants.PARAM_AREA_FILE)) {
-                areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue(Constants.PARAM_AREA_FILE))), StandardCharsets.UTF_8));
-            } else if (commandLine.hasOption(Constants.PARAM_TILE_SHAPE_FILE)) {
-                String tileShapeFile = commandLine.getOptionValue(Constants.PARAM_TILE_SHAPE_FILE);
-                if (Files.exists(Paths.get(tileShapeFile))) {
-                    Logger.getRootLogger().info("Reading S2 tiles extents");
-                    TilesMap.fromKmlFile(tileShapeFile);
-                    Logger.getRootLogger().info(String.valueOf(TilesMap.getCount() + " tiles found"));
-                }
-            } else {
-                BufferedReader reader =
-                        new BufferedReader(
-                                new InputStreamReader(
-                                        S2ProductDownloader.class.getResourceAsStream("tilemap.dat")));
-                Logger.getRootLogger().info("Loading S2 tiles extents");
-                TilesMap.read(reader);
-                Logger.getRootLogger().info(String.valueOf(TilesMap.getCount() + " tile extents loaded"));
             }
-
             if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
                 Collections.addAll(tiles, commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
             } else if (commandLine.hasOption(Constants.PARAM_TILE_LIST_FILE)) {
@@ -405,13 +442,15 @@ public class S2ProductDownloader {
             if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST)) {
                 String[] uuids = commandLine.getOptionValues(Constants.PARAM_PRODUCT_UUID_LIST);
                 String[] productNames = commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST);
-                if ((!commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE) || ProductStore.SCIHUB.toString().equals(commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE))) &&
+                if (sensorType == SensorType.S2 && (!commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE) || ProductStore.SCIHUB.toString().equals(commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE))) &&
                         (uuids == null || uuids.length != productNames.length)) {
                     System.err.println("For the list of product names a corresponding list of UUIDs has to be given!");
                     System.exit(-1);
                 }
                 for (int i = 0; i < productNames.length; i++) {
-                    ProductDescriptor productDescriptor = new ProductDescriptor(productNames[i]);
+                    ProductDescriptor productDescriptor = sensorType == SensorType.S2 ?
+                            new SentinelProductDescriptor(productNames[i]) :
+                            new LandsatProductDescriptor(productNames[i]);
                     if (uuids != null) {
                         productDescriptor.setId(uuids[i]);
                     }
@@ -419,7 +458,9 @@ public class S2ProductDownloader {
                 }
             } else if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST_FILE)) {
                 for (String line : Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_PRODUCT_LIST_FILE)))) {
-                    products.add(new ProductDescriptor(line));
+                    products.add(sensorType == SensorType.S2 ?
+                            new SentinelProductDescriptor(line) :
+                            new LandsatProductDescriptor(line));
                 }
             }
 
@@ -458,21 +499,25 @@ public class S2ProductDownloader {
 
             if (commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE)) {
                 String value = commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE);
-                downloader.setDownloadStore(Enum.valueOf(ProductStore.class, value));
+                if (downloader instanceof SentinelProductDownloader) {
+                    ((SentinelProductDownloader) downloader).setDownloadStore(Enum.valueOf(ProductStore.class, value));
+                }
                 Logger.getRootLogger().info("Products will be downloaded from %s", value);
             }
 
             downloader.shouldCompress(commandLine.hasOption(Constants.PARAM_FLAG_COMPRESS));
             downloader.shouldDeleteAfterCompression(commandLine.hasOption(Constants.PARAM_FLAG_DELETE));
             if (commandLine.hasOption(Constants.PARAM_FILL_ANGLES)) {
-                downloader.setFillMissingAnglesMethod(Enum.valueOf(FillAnglesMethod.class,
-                        commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
-                                commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase() :
-                                FillAnglesMethod.NONE.name()));
+                if (downloader instanceof SentinelProductDownloader) {
+                    ((SentinelProductDownloader) downloader).setFillMissingAnglesMethod(Enum.valueOf(FillAnglesMethod.class,
+                            commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
+                                    commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase() :
+                                    FillAnglesMethod.NONE.name()));
+                }
             }
 
             int numPoints = areaOfInterest.getNumPoints();
-            if (products.size() == 0 && numPoints == 0 && TilesMap.getCount() > 0) {
+            if (products.size() == 0 && numPoints == 0 && TilesMap.getCount() > 0 && sensorType == SensorType.S2) {
                 Rectangle2D rectangle2D = TilesMap.boundingBox(commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getY());
                 areaOfInterest.append(rectangle2D.getMaxX(), rectangle2D.getY());
@@ -527,7 +572,9 @@ public class S2ProductDownloader {
             } else {
                 Logger.getRootLogger().debug("Product name(s) present, no additional search will be performed.");
             }
-            downloader.setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
+            if (downloader instanceof  SentinelProductDownloader) {
+                ((SentinelProductDownloader) downloader).setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
+            }
             retCode = downloader.downloadProducts(products);
         }
         System.exit(retCode);

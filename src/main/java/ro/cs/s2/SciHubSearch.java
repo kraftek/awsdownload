@@ -111,7 +111,7 @@ class SciHubSearch extends AbstractSearch {
                     double currentClouds;
                     for (String string : strings) {
                         if (string.contains("<entry>")) {
-                            currentProduct = new ProductDescriptor();
+                            currentProduct = new SentinelProductDescriptor();
                         } else if (string.contains("</entry>")) {
                             if (currentProduct != null) {
                                 double cloudsPercentage = currentProduct.getCloudsPercentage();

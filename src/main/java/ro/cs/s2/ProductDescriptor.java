@@ -20,21 +20,19 @@ package ro.cs.s2;
  *
  * @author Cosmin Cara
  */
-public class ProductDescriptor {
-    private String name;
-    private String id;
-    private double cloudsPercentage;
-    private String sensingDate;
+public abstract class ProductDescriptor {
+    protected String name;
+    protected String id;
+    protected double cloudsPercentage;
+    protected String sensingDate;
 
     public ProductDescriptor() {}
 
     public ProductDescriptor(String name) {
         this.name = name;
-        String[] tokens = this.name.split("_");
-        if (tokens.length != 9) {
+        if (!verifyProductName(name)) {
             throw new IllegalArgumentException(String.format("The product name %s doesn't match the expected pattern", name));
         }
-        this.sensingDate = tokens[7].substring(1, tokens[7].indexOf("T"));
     }
 
     public String getName() {
@@ -67,4 +65,6 @@ public class ProductDescriptor {
     public String toString() {
         return this.name;
     }
+
+    protected abstract boolean verifyProductName(String name);
 }

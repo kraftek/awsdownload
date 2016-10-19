@@ -121,7 +121,7 @@ class AmazonSearch extends AbstractSearch {
         try (InputStream inputStream = new URI(jsonUrl).toURL().openStream()) {
             reader = Json.createReader(inputStream);
             JsonObject obj = reader.readObject();
-            descriptor = new ProductDescriptor();
+            descriptor = new SentinelProductDescriptor();
             descriptor.setName(obj.getString("name"));
             descriptor.setId(obj.getString("id"));
         } finally {
