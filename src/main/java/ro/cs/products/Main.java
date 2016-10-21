@@ -346,40 +346,48 @@ public class Main {
         String logFile = props.getProperty("master.log.file");
         String folder;
         boolean debugMode = commandLine.hasOption(Constants.PARAM_VERBOSE);
+        Logger.CustomLogger logger;
+        SensorType sensorType = Enum.valueOf(SensorType.class, commandLine.getOptionValue(Constants.SENSOR));
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
             folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));
             Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString(), debugMode);
+            logger = Logger.getRootLogger();
             printCommandLine(commandLine);
-            String rootFolder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
-            FillAnglesMethod fillAnglesMethod = Enum.valueOf(FillAnglesMethod.class,
-                    commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
-                            commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase() :
-                            FillAnglesMethod.NONE.name());
-            if (!FillAnglesMethod.NONE.equals(fillAnglesMethod)) {
-                try {
-                    Set<String> products = null;
-                    if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST)) {
-                        products = new HashSet<>();
-                        for (String product : commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST)) {
-                            if (!product.endsWith(".SAFE")) {
-                                products.add(product + ".SAFE");
-                            } else {
-                                products.add(product);
+            if (sensorType == SensorType.L8) {
+                logger.warn("Argument --input will be ignored for Landsat8");
+            } else {
+                String rootFolder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
+                FillAnglesMethod fillAnglesMethod = Enum.valueOf(FillAnglesMethod.class,
+                        commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
+                                commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase() :
+                                FillAnglesMethod.NONE.name());
+                if (!FillAnglesMethod.NONE.equals(fillAnglesMethod)) {
+                    try {
+                        Set<String> products = null;
+                        if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST)) {
+                            products = new HashSet<>();
+                            for (String product : commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST)) {
+                                if (!product.endsWith(".SAFE")) {
+                                    products.add(product + ".SAFE");
+                                } else {
+                                    products.add(product);
+                                }
                             }
                         }
+                        ProductInspector inspector = new ProductInspector(rootFolder, fillAnglesMethod, products);
+                        inspector.traverse();
+                    } catch (IOException e) {
+                        logger.error(e.getMessage());
+                        retCode = ReturnCode.DOWNLOAD_ERROR;
                     }
-                    ProductInspector inspector = new ProductInspector(rootFolder, fillAnglesMethod, products);
-                    inspector.traverse();
-                } catch (IOException e) {
-                    Logger.getRootLogger().error(e.getMessage());
-                    retCode = ReturnCode.DOWNLOAD_ERROR;
                 }
             }
         } else {
             folder = commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));
             Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString(), debugMode);
+            logger = Logger.getRootLogger();
             printCommandLine(commandLine);
 
             String proxyType = commandLine.hasOption(Constants.PARAM_PROXY_TYPE) ?
@@ -403,7 +411,6 @@ public class Main {
             Set<String> tiles = new HashSet<>();
             Polygon2D areaOfInterest = new Polygon2D();
 
-            SensorType sensorType = Enum.valueOf(SensorType.class, commandLine.getOptionValue(Constants.SENSOR));
             ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE, ProductStore.SCIHUB.toString()));
 
             if (sensorType == SensorType.S2 && !commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS) && !commandLine.hasOption(Constants.PARAM_USER)) {
@@ -437,18 +444,18 @@ public class Main {
             } else if (commandLine.hasOption(Constants.PARAM_TILE_SHAPE_FILE)) {
                 String tileShapeFile = commandLine.getOptionValue(Constants.PARAM_TILE_SHAPE_FILE);
                 if (Files.exists(Paths.get(tileShapeFile))) {
-                    Logger.getRootLogger().info(String.format("Reading %s tiles extents", sensorType));
+                    logger.info(String.format("Reading %s tiles extents", sensorType));
                     tileMap.fromKmlFile(tileShapeFile);
-                    Logger.getRootLogger().info(String.valueOf(tileMap.getCount() + " tiles found"));
+                    logger.info(String.valueOf(tileMap.getCount() + " tiles found"));
                 }
             } else {
                 BufferedReader reader =
                         new BufferedReader(
                                 new InputStreamReader(
                                         Main.class.getResourceAsStream(sensorType + "tilemap.dat")));
-                Logger.getRootLogger().info(String.format("Loading %s tiles extents", sensorType));
+                logger.info(String.format("Loading %s tiles extents", sensorType));
                 tileMap.read(reader);
-                Logger.getRootLogger().info(String.valueOf(tileMap.getCount() + " tile extents loaded"));
+                logger.info(String.valueOf(tileMap.getCount() + " tile extents loaded"));
             }
 
             if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
@@ -462,7 +469,7 @@ public class Main {
                 String[] productNames = commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST);
                 if (sensorType == SensorType.S2 && (!commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE) || ProductStore.SCIHUB.toString().equals(commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE))) &&
                         (uuids == null || uuids.length != productNames.length)) {
-                    System.err.println("For the list of product names a corresponding list of UUIDs has to be given!");
+                    logger.error("For the list of product names a corresponding list of UUIDs has to be given!");
                     System.exit(-1);
                 }
                 for (int i = 0; i < productNames.length; i++) {
@@ -519,8 +526,10 @@ public class Main {
                 String value = commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE);
                 if (downloader instanceof SentinelProductDownloader) {
                     ((SentinelProductDownloader) downloader).setDownloadStore(Enum.valueOf(ProductStore.class, value));
+                    logger.info("Products will be downloaded from %s", value);
+                } else {
+                    logger.warn("Argument --store will be ignored for Landsat8");
                 }
-                Logger.getRootLogger().info("Products will be downloaded from %s", value);
             }
 
             downloader.shouldCompress(commandLine.hasOption(Constants.PARAM_FLAG_COMPRESS));
@@ -531,6 +540,8 @@ public class Main {
                             commandLine.hasOption(Constants.PARAM_FILL_ANGLES) ?
                                     commandLine.getOptionValue(Constants.PARAM_FILL_ANGLES).toUpperCase() :
                                     FillAnglesMethod.NONE.name()));
+                } else {
+                    logger.warn("Argument --ma will be ignored for Landsat8");
                 }
             }
 
@@ -548,12 +559,12 @@ public class Main {
             if (products.size() == 0 && numPoints > 0) {
                 String searchUrl;
                 AbstractSearch searchProvider;
-                Logger.getRootLogger().debug("No product provider, searching on the AOI");
+                logger.debug("No product provider, searching on the AOI");
                 if (sensorType == SensorType.L8) {
-                    Logger.getRootLogger().debug("Search will be done for Landsat");
+                    logger.debug("Search will be done for Landsat");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_LANDSAT_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL);
                     if (!NetUtils.isAvailable(searchUrl)) {
-                        Logger.getRootLogger().warn(searchUrl + " is not available!");
+                        logger.warn(searchUrl + " is not available!");
                     }
                     searchProvider = new LandsatSearch(searchUrl);
                     if (commandLine.hasOption(Constants.PARAM_START_DATE)) {
@@ -567,10 +578,10 @@ public class Main {
                     }
                     ((LandsatSearch) searchProvider).limit(limit);
                 } else if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS)) {
-                    Logger.getRootLogger().debug("Search will be done on SciHub");
+                    logger.debug("Search will be done on SciHub");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
                     if (!NetUtils.isAvailable(searchUrl)) {
-                        Logger.getRootLogger().warn(searchUrl + " is not available!");
+                        logger.warn(searchUrl + " is not available!");
                         searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
                     }
                     searchProvider = new SciHubSearch(searchUrl);
@@ -584,7 +595,7 @@ public class Main {
                         search.filter(Constants.SEARCH_PARAM_RELATIVE_ORBIT_NUMBER, commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT));
                     }
                 } else {
-                    Logger.getRootLogger().debug("Search will be done on AWS");
+                    logger.debug("Search will be done on AWS");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_AWS_SEARCH_URL, Constants.PROPERTY_DEFAULT_AWS_SEARCH_URL);
                     searchProvider = new AmazonSearch(searchUrl);
                     searchProvider.setTiles(tiles);
@@ -607,7 +618,7 @@ public class Main {
                 searchProvider.setClouds(clouds);
                 products = searchProvider.execute();
             } else {
-                Logger.getRootLogger().debug("Product name(s) present, no additional search will be performed.");
+                logger.debug("Product name(s) present, no additional search will be performed.");
             }
             if (downloader instanceof  SentinelProductDownloader) {
                 ((SentinelProductDownloader) downloader).setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
