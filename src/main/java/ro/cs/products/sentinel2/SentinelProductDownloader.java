@@ -179,7 +179,7 @@ public class SentinelProductDownloader extends ProductDownloader {
             url = getMetadataUrl(product);
             Path metadataFile = rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
             currentStep = "Metadata";
-            downloadFile(url, metadataFile);
+            downloadFile(url, metadataFile, true);
             if (Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
                 List<String> metaTileNames = Utilities.filter(allLines, "<Granules");
@@ -207,7 +207,7 @@ public class SentinelProductDownloader extends ProductDownloader {
                         }
                     }
                     if (skippedTiles.trim().length() > 0) {
-                        getLogger().info("Skipped tiles: %s",skippedTiles);
+                        getLogger().info("Skipped tiles: %s", skippedTiles);
                     }
                     String count = String.valueOf(tileNames.size());
                     int tileCounter = 1;
