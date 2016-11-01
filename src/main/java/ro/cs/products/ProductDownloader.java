@@ -58,7 +58,7 @@ public abstract class ProductDownloader {
         this.destination = targetFolder;
         this.props = new Properties();
         try {
-            this.props.load(getClass().getResourceAsStream("download.properties"));
+            this.props.load(ProductDownloader.class.getResourceAsStream("download.properties"));
         } catch (IOException e) {
             getLogger().error("Cannot load properties file. Reason: %s", e.getMessage());
         }

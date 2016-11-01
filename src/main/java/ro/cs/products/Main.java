@@ -347,7 +347,9 @@ public class Main {
         String folder;
         boolean debugMode = commandLine.hasOption(Constants.PARAM_VERBOSE);
         Logger.CustomLogger logger;
-        SensorType sensorType = Enum.valueOf(SensorType.class, commandLine.getOptionValue(Constants.SENSOR));
+        SensorType sensorType = commandLine.hasOption(Constants.SENSOR) ?
+                Enum.valueOf(SensorType.class, commandLine.getOptionValue(Constants.SENSOR)) :
+                SensorType.S2;
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
             folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));

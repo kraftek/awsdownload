@@ -33,7 +33,7 @@ public class SentinelProductDescriptor extends ProductDescriptor {
 
     @Override
     protected boolean verifyProductName(String name) {
-        String[] tokens = this.name.split("_");
+        String[] tokens = name.split("_");
         return tokens.length == 9;
     }
 }
