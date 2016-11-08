@@ -46,6 +46,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Main execution class.
@@ -427,8 +428,8 @@ public class Main {
             }
 
             ProductDownloader downloader = sensorType.equals(SensorType.S2) ?
-                    new SentinelProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER)) :
-                    new LandsatProductDownloader(commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER));
+                    new SentinelProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER), props) :
+                    new LandsatProductDownloader(commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER), props);
 
             TileMap tileMap = sensorType == SensorType.S2 ?
                     SentinelTilesMap.getInstance() :
@@ -548,8 +549,9 @@ public class Main {
             }
 
             int numPoints = areaOfInterest.getNumPoints();
+            tiles = tiles.stream().map(t -> t.startsWith("T") ? t.substring(1) : t).collect(Collectors.toSet());
             if (products.size() == 0 && numPoints == 0 && tileMap.getCount() > 0) {
-                Rectangle2D rectangle2D = tileMap.boundingBox(commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
+                Rectangle2D rectangle2D = tileMap.boundingBox(tiles);
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getY());
                 areaOfInterest.append(rectangle2D.getMaxX(), rectangle2D.getY());
                 areaOfInterest.append(rectangle2D.getMaxX(), rectangle2D.getMaxY());

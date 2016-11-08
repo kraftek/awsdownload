@@ -54,14 +54,9 @@ public abstract class ProductDownloader {
 
     protected Logger.ScopeLogger productLogger;
 
-    public ProductDownloader(String targetFolder) {
+    public ProductDownloader(String targetFolder, Properties properties) {
         this.destination = targetFolder;
-        this.props = new Properties();
-        try {
-            this.props.load(ProductDownloader.class.getResourceAsStream("download.properties"));
-        } catch (IOException e) {
-            getLogger().error("Cannot load properties file. Reason: %s", e.getMessage());
-        }
+        this.props = properties;
     }
 
     int downloadProducts(List<ProductDescriptor> products) {

@@ -48,8 +48,6 @@ import java.util.regex.Pattern;
  */
 public class SentinelProductDownloader extends ProductDownloader {
     private static final String prefix = "S2A_OPER_PRD_MSIL1C_PDMC_";
-    private static final String tilePrefix = "S2A_OPER_MSI_L1C_TL_MTI__";
-    private static final String auxPrefix = "S2A_OPER_AUX_ECMWFT_MTI__";
     private static final Set<String> bandFiles = new LinkedHashSet<String>() {{
         add("B01.jp2");
         add("B02.jp2");
@@ -83,8 +81,8 @@ public class SentinelProductDownloader extends ProductDownloader {
 
     private Logger.ScopeLogger productLogger;
 
-    public SentinelProductDownloader(ProductStore source, String targetFolder) {
-        super(targetFolder);
+    public SentinelProductDownloader(ProductStore source, String targetFolder, Properties properties) {
+        super(targetFolder, properties);
         this.store = source;
 
         zipsUrl = props.getProperty("s2.aws.products.url", "http://sentinel-products-l1c.s3.amazonaws.com");
@@ -272,7 +270,8 @@ public class SentinelProductDownloader extends ProductDownloader {
         return rootPath;
     }
 
-    private Path downloadFromAWS(ProductDescriptor product) throws IOException {
+    private Path downloadFromAWS(ProductDescriptor productDescriptor) throws IOException {
+        SentinelProductDescriptor product = (SentinelProductDescriptor) productDescriptor;
         Path rootPath = null;
         String url;
         String productName = product.getName();
@@ -289,7 +288,7 @@ public class SentinelProductDownloader extends ProductDownloader {
             productLogger = new Logger.ScopeLogger(rootPath.resolve("download.log").toString());
             String baseProductUrl = getProductUrl(productName);
             url = baseProductUrl + "metadata.xml";
-            Path metadataFile = rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
+            Path metadataFile = rootPath.resolve(product.getMetadataFileName()); //rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
             currentStep = "Metadata";
             getLogger().debug("Downloading metadata file %s", metadataFile);
             metadataFile = downloadFile(url, metadataFile, true);
@@ -343,15 +342,15 @@ public class SentinelProductDownloader extends ProductDownloader {
                             Path auxData = Utilities.ensureExists(tileFolder.resolve("AUX_DATA"));
                             Path imgData = Utilities.ensureExists(tileFolder.resolve("IMG_DATA"));
                             Path qiData = Utilities.ensureExists(tileFolder.resolve("QI_DATA"));
-                            String refName = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
-                            String metadataName = refName.replace("MSI", "MTD");
-                            getLogger().debug("Downloading tile metadata %s", tileFolder.resolve(metadataName + ".xml"));
-                            Path tileMetaFile = downloadFile(tileUrl + "/metadata.xml", tileFolder.resolve(metadataName + ".xml"));
+                            //String refName = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
+                            String metadataName = product.getGranuleMetadataFileName(tileName); //refName.replace("MSI", "MTD");
+                            getLogger().debug("Downloading tile metadata %s", tileFolder.resolve(metadataName));
+                            Path tileMetaFile = downloadFile(tileUrl + "/metadata.xml", tileFolder.resolve(metadataName));
                             List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
                             for (String bandFileName : bandFiles) {
                                 try {
                                     String bandFileUrl = tileUrl + URL_SEPARATOR + bandFileName;
-                                    Path path = imgData.resolve(refName + NAME_SEPARATOR + bandFileName);
+                                    Path path = imgData.resolve(product.getBandFileName(tileName, bandFileName)); //imgData.resolve(refName + NAME_SEPARATOR + bandFileName);
                                     getLogger().debug("Downloading band raster %s from %s", path, bandFileName);
                                     downloadFile(bandFileUrl, path);
                                 } catch (IOException ex) {
@@ -376,7 +375,7 @@ public class SentinelProductDownloader extends ProductDownloader {
                                 }
                             }
                             getLogger().debug("Trying to download %s", tileUrl + "/auxiliary/ECMWFT");
-                            downloadFile(tileUrl + "/auxiliary/ECMWFT", auxData.resolve(refName.replace(tilePrefix, auxPrefix)));
+                            downloadFile(tileUrl + "/auxiliary/ECMWFT", auxData.resolve(product.getEcmWftFileName(tileName))); //auxData.resolve(refName.replace(tilePrefix, auxPrefix)));
                             if (dataStripId == null) {
                                 String tileJson = tileUrl + "/tileInfo.json";
                                 //URL tileJsonUrl = new URL(tileJson);
@@ -449,9 +448,9 @@ public class SentinelProductDownloader extends ProductDownloader {
             if (!shouldFilterTiles || (filteredTiles.size() == 0 || filteredTiles.contains(tileId))) {
                 tileId = "T" + tileId;
                 String tileName = Utilities.find(metaTileNames, tileId);
-                if (tileName == null) {
+                /*if (tileName == null) {
                     tileName = tilePrefix + dataTakeTokens[1] + "_A" + dataTakeTokens[2] + NAME_SEPARATOR + tileId + NAME_SEPARATOR + dataTakeTokens[3];
-                }
+                }*/
                 ret.put(tileName, baseUrl + tilePath);
             } else {
                 skippedTiles += tileId + " ";

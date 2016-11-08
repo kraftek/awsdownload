@@ -154,7 +154,7 @@ public class NetUtils {
                 RequestConfig config = RequestConfig.custom().setProxy(apacheHttpProxy).build();
                 get.setConfig(config);
             }
-            Logger.getRootLogger().debug("HTTP GET %s", url);
+            //Logger.getRootLogger().debug("HTTP GET %s", url);
             RequestConfig config = get.getConfig();
             if (config != null) {
                 Logger.getRootLogger().debug("Details: %s", config.toString());

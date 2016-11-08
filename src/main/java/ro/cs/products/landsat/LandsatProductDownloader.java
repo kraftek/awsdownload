@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashSet;
+import java.util.Properties;
 import java.util.Set;
 
 /**
@@ -49,8 +50,8 @@ public class LandsatProductDownloader extends ProductDownloader {
         add("_BQA.TIF");
     }};
 
-    public LandsatProductDownloader(String targetFolder) {
-        super(targetFolder);
+    public LandsatProductDownloader(String targetFolder, Properties properties) {
+        super(targetFolder, properties);
 
         baseUrl = props.getProperty("l8.aws.products.url", "http://landsat-pds.s3.amazonaws.com/L8/");
         if (!baseUrl.endsWith("/"))

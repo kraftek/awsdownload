@@ -104,7 +104,7 @@ public abstract class TileMap {
      * Computes the bounding box for the given list of tile identifiers
      * @param tileCodes     List of tile identifiers
      */
-    public Rectangle2D boundingBox(String...tileCodes) {
+    public Rectangle2D boundingBox(Set<String> tileCodes) {
         if (tileCodes == null) {
             return null;
         }
