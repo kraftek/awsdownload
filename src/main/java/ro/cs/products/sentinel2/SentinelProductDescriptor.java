@@ -66,7 +66,7 @@ public class SentinelProductDescriptor extends ProductDescriptor {
             String tokens[] = getTokens(TileV13, granuleIdentifier, new HashMap<Integer, String>() {{
                 put(2, "MTD"); put(9, "");
             }});
-            metaName = String.join("_", Arrays.copyOfRange(tokens, 0, 9)) + ".xml";
+            metaName = String.join("_", Arrays.copyOfRange(tokens, 0, 6)) + "__" + String.join("_", Arrays.copyOfRange(tokens, 6, 9)) + ".xml";
         } else {
             metaName = "MTD_TL.xml";
         }
@@ -79,7 +79,7 @@ public class SentinelProductDescriptor extends ProductDescriptor {
         String prodName = this.name.endsWith(".SAFE") ? this.name.substring(0, this.name.length() - 5) : this.name;
         if (this.oldFormat) {
             tokens = getTokens(TileV13, granuleIdentifier, null);
-            fileName = String.join("_", Arrays.copyOfRange(tokens, 0, 9)) + "_" + band;
+            fileName = String.join("_", Arrays.copyOfRange(tokens, 0, 6)) + "__" + String.join("_", Arrays.copyOfRange(tokens, 6, 9)) + "_" + band;
         } else {
             tokens = getTokens(ProductV14, prodName, null);
             fileName = tokens[5] + "_" + tokens[2] + "_" + band;
