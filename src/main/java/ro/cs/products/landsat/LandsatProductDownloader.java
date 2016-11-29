@@ -81,7 +81,7 @@ public class LandsatProductDownloader extends ProductDownloader {
                 currentStep = "Band " + bandFileName;
                 try {
                     String bandFileUrl = getProductUrl(productName) + bandFileName;
-                    Path path = rootPath.resolve(productName + bandFileName);
+                    Path path = rootPath.resolve(bandFileName);
                     getLogger().debug("Downloading band raster %s from %s", path, bandFileUrl);
                     downloadFile(bandFileUrl, path);
                 } catch (IOException ex) {
