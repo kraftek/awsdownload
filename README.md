@@ -17,6 +17,9 @@ supplied either as a list of comma-separated pairs of coordinates as argument, o
 
 Filtering on products is mutually exclusive with filtering on an area of interest. The AOI is used to query SciHub for products intersecting it, optionally by supplying the start and end of sensing times. If the AOI is a polygon which has more than 200 points, the extent (bounding box) of this polygon will be used instead.
 
+#Binaries
+The latest binaries can be found at https://github.com/kraftek/awsdownload/releases/.
+
 #How to use it with Git and Maven:
 1. Locally clone the repository
     git clone https://github.com/kraftek/awsdownload.git
