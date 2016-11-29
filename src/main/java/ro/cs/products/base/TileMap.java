@@ -19,14 +19,12 @@ import java.awt.geom.Rectangle2D;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -41,10 +39,14 @@ public abstract class TileMap {
         tiles = new TreeMap<>();
     }
 
-    public void read(BufferedReader bufferedReader) throws IOException {
-        try {
+    public void read(InputStream inputStream) throws IOException {
+        try (Scanner scanner = new Scanner(inputStream)) {
             String line, tile;
-            while ((line = bufferedReader.readLine()) != null) {
+            while (scanner.hasNextLine()) {
+                line = scanner.nextLine();
+                if (scanner.ioException() != null) {
+                    throw scanner.ioException();
+                }
                 tile = line.substring(0, line.indexOf(" "));
                 line = line.replaceAll(tile, "").trim();
                 //line = line.substring(0, line.length() - 1);
@@ -57,8 +59,8 @@ public abstract class TileMap {
                 tiles.put(tile, rectangle);
             }
         } finally {
-            if (bufferedReader != null)
-                bufferedReader.close();
+            if (inputStream != null)
+                inputStream.close();
         }
     }
 

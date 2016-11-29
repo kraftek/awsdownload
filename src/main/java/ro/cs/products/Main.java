@@ -35,9 +35,7 @@ import ro.cs.products.sentinel2.workaround.ProductInspector;
 import ro.cs.products.util.*;
 
 import java.awt.geom.Rectangle2D;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -452,12 +450,8 @@ public class Main {
                     logger.info(String.valueOf(tileMap.getCount() + " tiles found"));
                 }
             } else {
-                BufferedReader reader =
-                        new BufferedReader(
-                                new InputStreamReader(
-                                        Main.class.getResourceAsStream(sensorType + "tilemap.dat")));
                 logger.info(String.format("Loading %s tiles extents", sensorType));
-                tileMap.read(reader);
+                tileMap.read( Main.class.getResourceAsStream(sensorType + "tilemap.dat"));
                 logger.info(String.valueOf(tileMap.getCount() + " tile extents loaded"));
             }
 
