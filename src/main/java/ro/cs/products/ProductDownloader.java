@@ -106,22 +106,30 @@ public abstract class ProductDownloader {
         this.shouldDeleteAfterCompression = shouldDeleteAfterCompression;
     }
 
-    protected abstract String getProductUrl(String productName);
+    protected abstract <T extends ProductDescriptor> String getProductUrl(T descriptor);
 
     protected abstract String getMetadataUrl(ProductDescriptor descriptor);
 
     protected abstract Path download(ProductDescriptor product) throws IOException;
 
     protected Path downloadFile(String remoteUrl, Path file) throws IOException {
-        return downloadFile(remoteUrl, file, false);
+        return downloadFile(remoteUrl, file, null);
+    }
+
+    protected Path downloadFile(String remoteUrl, Path file, String authToken) throws IOException {
+        return downloadFile(remoteUrl, file, false, authToken);
     }
 
     protected Path downloadFile(String remoteUrl, Path file, boolean overwrite) throws IOException {
+        return downloadFile(remoteUrl, file, overwrite, null);
+    }
+
+    protected Path downloadFile(String remoteUrl, Path file, boolean overwrite, String authToken) throws IOException {
         HttpURLConnection connection = null;
         Path tmpFile = null;
         try {
             Logger.getRootLogger().debug("Begin download for %s", remoteUrl);
-            connection = NetUtils.openConnection(remoteUrl, (String) null);
+            connection = NetUtils.openConnection(remoteUrl, authToken);
             long remoteFileLength = connection.getContentLengthLong();
             long localFileLength = 0;
             if (!Files.exists(file) || remoteFileLength != (localFileLength = Files.size(file)) || overwrite) {

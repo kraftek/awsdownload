@@ -62,15 +62,33 @@ public class Utilities {
         return result;
     }
 
-    public static String find(List<String> input, String filter) {
+    public static String find(List<String> input, String filter, String psdVersion) {
         String value = null;
-        String granuleName;
-        for (String line : input) {
-            granuleName = getAttributeValue(line, "granuleIdentifier");
-            if (granuleName.contains(filter)) {
-                value = granuleName;
+        String granuleIdentifier;
+        switch (psdVersion) {
+            case "13" :
+                for (String line : input) {
+                    granuleIdentifier = getAttributeValue(line, "granuleIdentifier");
+                    if (granuleIdentifier.contains(filter)) {
+                        value = granuleIdentifier;
+                        break;
+                    }
+                }
                 break;
-            }
+            case "14":
+                String datastripIdentifier;
+                for (String line : input) {
+                    granuleIdentifier = getAttributeValue(line, "granuleIdentifier");
+                    if (granuleIdentifier.contains(filter)) {
+                        datastripIdentifier = getAttributeValue(line, "datastripIdentifier");
+                        value = granuleIdentifier.substring(13, 16) + "_" +
+                                granuleIdentifier.substring(49, 55) + "_" +
+                                granuleIdentifier.substring(41, 48) + "_" +
+                                datastripIdentifier.substring(42, 57);
+                        break;
+                    }
+                }
+                break;
         }
         return value;
     }

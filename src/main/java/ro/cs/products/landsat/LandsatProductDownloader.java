@@ -60,7 +60,7 @@ public class LandsatProductDownloader extends ProductDownloader {
 
     @Override
     protected String getMetadataUrl(ProductDescriptor descriptor) {
-        return getProductUrl(descriptor.getName()) + descriptor.getName() + "_MTL.txt";
+        return getProductUrl(descriptor) + descriptor.getName() + "_MTL.txt";
     }
 
     @Override
@@ -80,7 +80,7 @@ public class LandsatProductDownloader extends ProductDownloader {
                 String bandFileName = productName + suffix;
                 currentStep = "Band " + bandFileName;
                 try {
-                    String bandFileUrl = getProductUrl(productName) + bandFileName;
+                    String bandFileUrl = getProductUrl(product) + bandFileName;
                     Path path = rootPath.resolve(bandFileName);
                     getLogger().debug("Downloading band raster %s from %s", path, bandFileUrl);
                     downloadFile(bandFileUrl, path);
@@ -100,9 +100,7 @@ public class LandsatProductDownloader extends ProductDownloader {
     }
 
     @Override
-    protected String getProductUrl(String productName) {
-        String row = productName.substring(3, 6);
-        String path = productName.substring(6, 9);
-        return baseUrl + row + URL_SEPARATOR + path + URL_SEPARATOR + productName + URL_SEPARATOR;
+    protected String getProductUrl(ProductDescriptor descriptor) {
+        return baseUrl + descriptor.getProductRelativePath();
     }
 }

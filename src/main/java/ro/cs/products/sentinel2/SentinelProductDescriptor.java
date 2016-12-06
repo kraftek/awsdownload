@@ -15,6 +15,7 @@
  */
 package ro.cs.products.sentinel2;
 
+import ro.cs.products.ProductDownloader;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.util.Logger;
 
@@ -43,6 +44,34 @@ public class SentinelProductDescriptor extends ProductDescriptor {
 
     public SentinelProductDescriptor(String name) {
         super(name);
+        this.version = this.oldFormat ? "13" : "14";
+    }
+
+    @Override
+    public String getVersion() {
+        if (this.version == null) {
+            this.version = this.oldFormat ? "13" : "14";
+        }
+        return this.version;
+    }
+
+    @Override
+    public String getProductRelativePath() {
+        String year, day, month;
+        if (this.oldFormat) {
+            String[] tokens = getTokens(ProductV13, this.name, null);
+            String dateToken = tokens[7];
+            year = dateToken.substring(1, 5);
+            month = String.valueOf(Integer.parseInt(dateToken.substring(5, 7)));
+            day = String.valueOf(Integer.parseInt(dateToken.substring(7, 9)));
+        } else {
+            String[] tokens = getTokens(ProductV14, this.name, null);
+            String dateToken = tokens[2];
+            year = dateToken.substring(0, 4);
+            month = String.valueOf(Integer.parseInt(dateToken.substring(4, 6)));
+            day = String.valueOf(Integer.parseInt(dateToken.substring(6, 8)));
+        }
+        return year + ProductDownloader.URL_SEPARATOR + month + ProductDownloader.URL_SEPARATOR + day + ProductDownloader.URL_SEPARATOR + this.name + ProductDownloader.URL_SEPARATOR;
     }
 
     String getMetadataFileName() {
@@ -58,6 +87,39 @@ public class SentinelProductDescriptor extends ProductDescriptor {
             metaName = "MTD_MSIL1C.xml";
         }
         return metaName;
+    }
+
+    String getDatastripMetadataFileName(String datastripIdentifier) {
+        String name;
+        if (this.oldFormat) {
+            name = datastripIdentifier.substring(0, datastripIdentifier.lastIndexOf("_")) + ".xml";
+        } else {
+            name = "MTD_DS.xml";
+        }
+        return name;
+    }
+
+    String getDatastripFolder(String datastripIdentifier) {
+        String folder;
+        if (this.oldFormat) {
+            folder = datastripIdentifier;
+        } else {
+            folder = datastripIdentifier.substring(17, 57);
+        }
+        return folder;
+    }
+
+    String getGranuleFolder(String datastripIdentifier, String granuleIdentifier) {
+        String folder;
+        if (this.oldFormat) {
+            folder = granuleIdentifier;
+        } else {
+            folder = granuleIdentifier.substring(13, 16) + "_" +
+                        granuleIdentifier.substring(49, 55) + "_" +
+                        granuleIdentifier.substring(41, 48) + "_" +
+                        datastripIdentifier.substring(42, 57);
+        }
+        return folder;
     }
 
     String getGranuleMetadataFileName(String granuleIdentifier) {

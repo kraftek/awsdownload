@@ -15,6 +15,7 @@
  */
 package ro.cs.products.landsat;
 
+import ro.cs.products.ProductDownloader;
 import ro.cs.products.base.ProductDescriptor;
 
 import java.util.regex.Pattern;
@@ -34,6 +35,7 @@ public class LandsatProductDescriptor extends ProductDescriptor {
 
     public LandsatProductDescriptor(String name) {
         super(name);
+        this.version = "1";
     }
 
     public String getRow() {
@@ -50,6 +52,13 @@ public class LandsatProductDescriptor extends ProductDescriptor {
 
     public void setPath(String path) {
         this.path = path;
+    }
+
+    @Override
+    public String getProductRelativePath() {
+        String row = this.name.substring(3, 6);
+        String path = this.name.substring(6, 9);
+        return row + ProductDownloader.URL_SEPARATOR + path + ProductDownloader.URL_SEPARATOR + this.name + ProductDownloader.URL_SEPARATOR;
     }
 
     @Override

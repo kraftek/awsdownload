@@ -557,7 +557,7 @@ public class Main {
             if (products.size() == 0 && numPoints > 0) {
                 String searchUrl;
                 AbstractSearch searchProvider;
-                logger.debug("No product provider, searching on the AOI");
+                logger.debug("No product provided, searching on the AOI");
                 if (sensorType == SensorType.L8) {
                     logger.debug("Search will be done for Landsat");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_LANDSAT_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL);

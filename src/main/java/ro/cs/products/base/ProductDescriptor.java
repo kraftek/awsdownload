@@ -25,6 +25,7 @@ public abstract class ProductDescriptor {
     protected String id;
     protected double cloudsPercentage;
     protected String sensingDate;
+    protected String version;
 
     public ProductDescriptor() {}
 
@@ -51,6 +52,10 @@ public abstract class ProductDescriptor {
         this.id = id;
     }
 
+    public String getVersion() { return version; }
+
+    public void setVersion(String version) { this.version = version; }
+
     public double getCloudsPercentage() {
         return cloudsPercentage;
     }
@@ -62,6 +67,8 @@ public abstract class ProductDescriptor {
     public String getSensingDate() { return sensingDate; }
 
     public void setSensingDate(String date) { this.sensingDate = date; }
+
+    public abstract String getProductRelativePath();
 
     @Override
     public String toString() {

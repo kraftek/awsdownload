@@ -103,7 +103,7 @@ public class SentinelProductDownloader extends ProductDownloader {
         odataArchivePath = odp.root(scihubUrl + "/Products('${UUID}')").value();
         odp.root(odataProductPath).node("GRANULE").node("${tile}");
         odataTilePath = odp.path();
-        odataMetadataPath = odp.root(odataProductPath).node("${xmlname}.xml").value();
+        odataMetadataPath = odp.root(odataProductPath).node("${xmlname}").value();
         fillMissingAnglesMethod = FillAnglesMethod.NONE;
     }
 
@@ -149,10 +149,10 @@ public class SentinelProductDownloader extends ProductDownloader {
         String url = null;
         switch (store) {
             case AWS:
-                url = getProductUrl(descriptor.getName()) + "metadata.xml";
+                url = getProductUrl(descriptor) + "metadata.xml";
                 break;
             case SCIHUB:
-                String metadateFileName = descriptor.getName().replace("PRD_MSIL1C", "MTD_SAFL1C");
+                String metadateFileName = ((SentinelProductDescriptor) descriptor).getMetadataFileName();
                 url = odataMetadataPath.replace("${UUID}", descriptor.getId())
                                   .replace("${PRODUCT_NAME}", descriptor.getName())
                                   .replace("${xmlname}", metadateFileName);
@@ -161,26 +161,27 @@ public class SentinelProductDownloader extends ProductDownloader {
         return url;
     }
 
-    private Path downloadFromSciHub(ProductDescriptor product) throws IOException {
+    private Path downloadFromSciHub(ProductDescriptor productDescriptor) throws IOException {
         Path rootPath = null;
         String url;
+        SentinelProductDescriptor product = (SentinelProductDescriptor) productDescriptor;
         Utilities.ensureExists(Paths.get(destination));
         String productName = product.getName();
         if (!shouldFilterTiles) {
             currentStep = "Archive";
             url = odataArchivePath.replace("${UUID}", product.getId());
             rootPath = Paths.get(destination, productName + ".zip");
-            rootPath = downloadFile(url, rootPath);
+            rootPath = downloadFile(url, rootPath, NetUtils.getAuthToken());
         }
         if (rootPath == null || !Files.exists(rootPath)) {
             rootPath = Utilities.ensureExists(Paths.get(destination, productName + ".SAFE"));
             url = getMetadataUrl(product);
-            Path metadataFile = rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
+            Path metadataFile = rootPath.resolve(product.getMetadataFileName());
             currentStep = "Metadata";
-            downloadFile(url, metadataFile, true);
+            downloadFile(url, metadataFile, true, NetUtils.getAuthToken());
             if (Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
-                List<String> metaTileNames = Utilities.filter(allLines, "<Granules");
+                List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + ("13".equals(product.getVersion()) ? "s" : " "));
                 boolean hasTiles = updateMedatata(metadataFile, allLines);
                 if (hasTiles) {
                     Path tilesFolder = Utilities.ensureExists(rootPath.resolve("GRANULE"));
@@ -193,13 +194,14 @@ public class SentinelProductDownloader extends ProductDownloader {
                         String tileId = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
                         tileId = tileId.substring(tileId.lastIndexOf(NAME_SEPARATOR) + 2);
                         if (filteredTiles.size() == 0 || filteredTiles.contains(tileId)) {
-                            String granule = Utilities.getAttributeValue(tileName, "granuleIdentifier");
-                            tileNames.put(granule, odataTilePath.replace("${UUID}", product.getId())
-                                    .replace("${PRODUCT_NAME}", productName)
-                                    .replace("${tile}", granule));
+                            String granuleId = Utilities.getAttributeValue(tileName, "granuleIdentifier");
                             if (dataStripId == null) {
                                 dataStripId = Utilities.getAttributeValue(tileName, "datastripIdentifier");
                             }
+                            String granule = product.getGranuleFolder(dataStripId, granuleId);
+                            tileNames.put(granuleId, odataTilePath.replace("${UUID}", product.getId())
+                                    .replace("${PRODUCT_NAME}", productName)
+                                    .replace("${tile}", granule));
                         } else {
                             skippedTiles += tileId + " ";
                         }
@@ -214,19 +216,24 @@ public class SentinelProductDownloader extends ProductDownloader {
                         long start = System.currentTimeMillis();
                         currentStep = "Tile " + String.valueOf(tileCounter++) + "/" + count;
                         String tileUrl = entry.getValue();
-                        String tileName = entry.getKey();
+                        String granuleId = entry.getKey();
+                        String tileName = product.getGranuleFolder(dataStripId, granuleId);
                         Path tileFolder = Utilities.ensureExists(tilesFolder.resolve(tileName));
                         Path auxData = Utilities.ensureExists(tileFolder.resolve("AUX_DATA"));
                         Path imgData = Utilities.ensureExists(tileFolder.resolve("IMG_DATA"));
                         Path qiData = Utilities.ensureExists(tileFolder.resolve("QI_DATA"));
-                        String refName = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
-                        String metadataName = refName.replace("MSI", "MTD") + ".xml";
-                        Path tileMetaFile = downloadFile(pathBuilder.root(tileUrl).node(metadataName).value(), tileFolder.resolve(metadataName));
+                        String metadataName = product.getGranuleMetadataFileName(granuleId);
+                        Path tileMetaFile = downloadFile(pathBuilder.root(tileUrl).node(metadataName).value(), tileFolder.resolve(metadataName), NetUtils.getAuthToken());
                         if (tileMetaFile != null) {
                             if (Files.exists(tileMetaFile)) {
                                 List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
                                 for (String bandFileName : bandFiles) {
-                                    downloadFile(pathBuilder.root(tileUrl).node("IMG_DATA").node(refName + NAME_SEPARATOR + bandFileName).value(), imgData.resolve(refName + NAME_SEPARATOR + bandFileName));
+                                    downloadFile(pathBuilder.root(tileUrl)
+                                                            .node("IMG_DATA")
+                                                            .node(product.getBandFileName(granuleId, bandFileName))
+                                                            .value(),
+                                            imgData.resolve(product.getBandFileName(granuleId, bandFileName)),
+                                            NetUtils.getAuthToken());
                                 }
                                 List<String> lines = Utilities.filter(tileMetadataLines, "<MASK_FILENAME");
                                 for (String line : lines) {
@@ -234,7 +241,13 @@ public class SentinelProductDownloader extends ProductDownloader {
                                     int firstTagCloseIdx = line.indexOf(">") + 1;
                                     int secondTagBeginIdx = line.indexOf("<", firstTagCloseIdx);
                                     String maskFileName = line.substring(firstTagCloseIdx, secondTagBeginIdx);
-                                    downloadFile(pathBuilder.root(tileUrl).node("QI_DATA").node(maskFileName).value(), qiData.resolve(maskFileName));
+                                    maskFileName = maskFileName.substring(maskFileName.lastIndexOf(URL_SEPARATOR) + 1);
+                                    downloadFile(pathBuilder.root(tileUrl)
+                                                            .node("QI_DATA")
+                                                            .node(maskFileName)
+                                                            .value(),
+                                            qiData.resolve(maskFileName),
+                                            NetUtils.getAuthToken());
                                 }
                                 getLogger().info("Tile download completed in %s", Utilities.formatTime(System.currentTimeMillis() - start));
                             } else {
@@ -245,12 +258,12 @@ public class SentinelProductDownloader extends ProductDownloader {
                     if (dataStripId != null) {
                         String dataStripPath = pathBuilder.root(odataProductPath.replace("${UUID}", product.getId())
                                                                                 .replace("${PRODUCT_NAME}", productName))
-                                                          .node("DATASTRIP").node(dataStripId)
-                                                          .node(dataStripId.substring(0, dataStripId.lastIndexOf("_")) + ".xml")
+                                                          .node("DATASTRIP").node(product.getDatastripFolder(dataStripId))
+                                                          .node(product.getDatastripMetadataFileName(dataStripId))
                                                           .value();
-                        Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(dataStripId));
-                        String dataStripFile = dataStripId.substring(0, dataStripId.lastIndexOf(NAME_SEPARATOR)).replace("MSI", "MTD") + ".xml";
-                        downloadFile(dataStripPath, dataStrip.resolve(dataStripFile));
+                        Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(product.getDatastripFolder(dataStripId)));
+                        String dataStripFile = product.getDatastripMetadataFileName(dataStripId);
+                        downloadFile(dataStripPath, dataStrip.resolve(dataStripFile), NetUtils.getAuthToken());
                     }
                 } else {
                     Files.deleteIfExists(metadataFile);
@@ -286,7 +299,7 @@ public class SentinelProductDownloader extends ProductDownloader {
             // let's try to assemble the product
             rootPath = Utilities.ensureExists(Paths.get(destination, productName + ".SAFE"));
             productLogger = new Logger.ScopeLogger(rootPath.resolve("download.log").toString());
-            String baseProductUrl = getProductUrl(productName);
+            String baseProductUrl = getProductUrl(product);
             url = baseProductUrl + "metadata.xml";
             Path metadataFile = rootPath.resolve(product.getMetadataFileName()); //rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
             currentStep = "Metadata";
@@ -297,7 +310,7 @@ public class SentinelProductDownloader extends ProductDownloader {
             Path previewFile = metadataFile.resolveSibling("preview.png");
             if (metadataFile != null && Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
-                List<String> metaTileNames = Utilities.filter(allLines, "<Granules");
+                List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + ("13".equals(product.getVersion()) ? "s" : " "));
                 boolean hasTiles = updateMedatata(metadataFile, allLines);
                 if (hasTiles) {
                     downloadFile(baseProductUrl + "inspire.xml", inspireFile);
@@ -330,7 +343,7 @@ public class SentinelProductDownloader extends ProductDownloader {
                         reader = Json.createReader(inputStream);
                         getLogger().debug("Parsing json descriptor %s", productJsonUrl);
                         JsonObject obj = reader.readObject();
-                        final Map<String, String> tileNames = getTileNames(obj, metaTileNames);
+                        final Map<String, String> tileNames = getTileNames(obj, metaTileNames, product.getVersion());
                         String dataStripId = null;
                         String count = String.valueOf(tileNames.size());
                         int tileCounter = 1;
@@ -363,9 +376,17 @@ public class SentinelProductDownloader extends ProductDownloader {
                                 int firstTagCloseIdx = line.indexOf(">") + 1;
                                 int secondTagBeginIdx = line.indexOf("<", firstTagCloseIdx);
                                 String maskFileName = line.substring(firstTagCloseIdx, secondTagBeginIdx);
-                                String[] tokens = maskFileName.split(NAME_SEPARATOR);
-                                String remoteName = tokens[2] + NAME_SEPARATOR + tokens[3] + NAME_SEPARATOR + tokens[9] + ".gml";
-                                Path path = qiData.resolve(maskFileName);
+                                String remoteName;
+                                Path path;
+                                if ("13".equals(product.getVersion())) {
+                                    String[] tokens = maskFileName.split(NAME_SEPARATOR);
+                                    remoteName = tokens[2] + NAME_SEPARATOR + tokens[3] + NAME_SEPARATOR + tokens[9] + ".gml";
+                                    path = qiData.resolve(maskFileName);
+                                } else {
+                                    remoteName = maskFileName.substring(maskFileName.lastIndexOf(URL_SEPARATOR) + 1);
+                                    path = rootPath.resolve(maskFileName);
+                                }
+
                                 try {
                                     String fileUrl = tileUrl + "/qi/" + remoteName;
                                     getLogger().debug("Downloading file %s from %s", path, fileUrl);
@@ -391,9 +412,9 @@ public class SentinelProductDownloader extends ProductDownloader {
                                     JsonObject tileObj = tiReader.readObject();
                                     dataStripId = tileObj.getJsonObject("datastrip").getString("id");
                                     String dataStripPath = tileObj.getJsonObject("datastrip").getString("path") + "/metadata.xml";
-                                    Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(dataStripId));
-                                    Utilities.ensureExists(dataStripFolder.resolve("QI_DATE"));
-                                    String dataStripFile = dataStripId.substring(0, dataStripId.lastIndexOf(NAME_SEPARATOR)).replace("MSI", "MTD") + ".xml";
+                                    Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(product.getDatastripFolder(dataStripId)));
+                                    String dataStripFile = product.getDatastripMetadataFileName(dataStripId);
+                                    Utilities.ensureExists(dataStrip.resolve("QI_DATA"));
                                     getLogger().debug("Downloading %s", baseUrl + dataStripPath);
                                     downloadFile(baseUrl + dataStripPath, dataStrip.resolve(dataStripFile));
                                 } finally {
@@ -427,15 +448,11 @@ public class SentinelProductDownloader extends ProductDownloader {
     }
 
     @Override
-    protected String getProductUrl(String productName) {
-        String dateToken = productName.replace(prefix, "").substring(22, 30);
-        String year = dateToken.substring(0, 4);
-        String month = String.valueOf(Integer.parseInt(dateToken.substring(4, 6)));
-        String day = String.valueOf(Integer.parseInt(dateToken.substring(6, 8)));
-        return productsUrl + year + URL_SEPARATOR + month + URL_SEPARATOR + day + URL_SEPARATOR + productName + URL_SEPARATOR;
+    protected String getProductUrl(ProductDescriptor descriptor) {
+        return productsUrl + descriptor.getProductRelativePath();
     }
 
-    private Map<String, String> getTileNames(JsonObject productInfo, List<String> metaTileNames) {
+    private Map<String, String> getTileNames(JsonObject productInfo, List<String> metaTileNames, String psdVersion) {
         Map<String, String> ret = new HashMap<>();
         String dataTakeId = productInfo.getString("datatakeIdentifier");
         String[] dataTakeTokens = dataTakeId.split(NAME_SEPARATOR);
@@ -447,7 +464,7 @@ public class SentinelProductDownloader extends ProductDownloader {
             String tileId = tokens[1] + tokens[2] + tokens[3];
             if (!shouldFilterTiles || (filteredTiles.size() == 0 || filteredTiles.contains(tileId))) {
                 tileId = "T" + tileId;
-                String tileName = Utilities.find(metaTileNames, tileId);
+                String tileName = Utilities.find(metaTileNames, tileId, psdVersion);
                 /*if (tileName == null) {
                     tileName = tilePrefix + dataTakeTokens[1] + "_A" + dataTakeTokens[2] + NAME_SEPARATOR + tileId + NAME_SEPARATOR + dataTakeTokens[3];
                 }*/
