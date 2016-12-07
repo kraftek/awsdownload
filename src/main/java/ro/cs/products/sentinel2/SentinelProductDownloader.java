@@ -305,10 +305,10 @@ public class SentinelProductDownloader extends ProductDownloader {
             currentStep = "Metadata";
             getLogger().debug("Downloading metadata file %s", metadataFile);
             metadataFile = downloadFile(url, metadataFile, true);
-            Path inspireFile = metadataFile.resolveSibling("INSPIRE.xml");
-            Path manifestFile = metadataFile.resolveSibling("manifest.safe");
-            Path previewFile = metadataFile.resolveSibling("preview.png");
             if (metadataFile != null && Files.exists(metadataFile)) {
+                Path inspireFile = metadataFile.resolveSibling("INSPIRE.xml");
+                Path manifestFile = metadataFile.resolveSibling("manifest.safe");
+                Path previewFile = metadataFile.resolveSibling("preview.png");
                 List<String> allLines = Files.readAllLines(metadataFile);
                 List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + ("13".equals(product.getVersion()) ? "s" : " "));
                 boolean hasTiles = updateMedatata(metadataFile, allLines);
