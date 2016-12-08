@@ -71,4 +71,5 @@ public class Constants {
     public static final String PARAM_PROXY_PORT = "pport";
     public static final String PARAM_PROXY_USER = "puser";
     public static final String PARAM_PROXY_PASSWORD = "ppwd";
+    public static final String PARAM_GUI = "gui";
 }

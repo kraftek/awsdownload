@@ -54,9 +54,15 @@ public abstract class ProductDownloader {
 
     protected Logger.ScopeLogger productLogger;
 
+    protected BatchProgressListener listener;
+
     public ProductDownloader(String targetFolder, Properties properties) {
         this.destination = targetFolder;
         this.props = properties;
+    }
+
+    public void setProgressListener(BatchProgressListener listener) {
+        this.listener = listener;
     }
 
     int downloadProducts(List<ProductDescriptor> products) {
@@ -92,6 +98,9 @@ public abstract class ProductDownloader {
                 long millis = System.currentTimeMillis() - startTime;
                 if (file != null && Files.exists(file)) {
                     getLogger().info("Product download completed in %s", Utilities.formatTime(millis));
+                }
+                if (listener != null) {
+                    listener.notifyProgress((double) productCounter / (double) productCount);
                 }
             }
         }

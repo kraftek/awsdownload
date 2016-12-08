@@ -78,48 +78,57 @@ public class AmazonSearch extends AbstractSearch {
             for (int year = yearStart; year <= yearEnd; year++) {
                 String yearUrl = tileUrl + String.valueOf(year) + "/";
                 Result yearResult = ResultParser.parse(NetUtils.getResponseAsString(yearUrl));
-                Set<Integer> months = yearResult.getCommonPrefixes().stream()
-                        .map(p -> { String tmp = p.replace(yearResult.getPrefix(), "");
-                                    return Integer.parseInt(tmp.substring(0, tmp.indexOf(yearResult.getDelimiter())));
-                        }).collect(Collectors.toSet());
-                int monthS = year == yearStart ? monthStart : 1;
-                int monthE = year == yearEnd ? monthEnd : 12;
-                for (int month = monthS; month <= monthE; month++) {
-                    if (months.contains(month)) {
-                        String monthUrl = yearUrl + String.valueOf(month) + "/";
-                        Result monthResult = ResultParser.parse(NetUtils.getResponseAsString(monthUrl));
-                        Set<Integer> days = monthResult.getCommonPrefixes().stream()
-                                .map(p -> { String tmp = p.replace(monthResult.getPrefix(), "");
-                                    return Integer.parseInt(tmp.substring(0, tmp.indexOf(monthResult.getDelimiter())));
-                                }).collect(Collectors.toSet());
-                        int dayS = month == monthS ? dayStart : 1;
-                        Calendar calendar = new Calendar.Builder().setDate(year, month + 1, 1).build();
-                        calendar.add(Calendar.DAY_OF_MONTH, -1);
-                        int dayE = month == monthE ? dayEnd : calendar.get(Calendar.DAY_OF_MONTH);
-                        for (int day = dayS; day <= dayE; day++) {
-                            if (days.contains(day)) {
-                                String dayUrl = monthUrl + String.valueOf(day) + "/";
-                                Result dayResult = ResultParser.parse(NetUtils.getResponseAsString(dayUrl));
-                                Set<Integer> sequences = dayResult.getCommonPrefixes().stream()
-                                        .map(p -> { String tmp = p.replace(dayResult.getPrefix(), "");
-                                            return Integer.parseInt(tmp.substring(0, tmp.indexOf(dayResult.getDelimiter())));
+                if (yearResult.getCommonPrefixes() != null) {
+                    Set<Integer> months = yearResult.getCommonPrefixes().stream()
+                            .map(p -> {
+                                String tmp = p.replace(yearResult.getPrefix(), "");
+                                return Integer.parseInt(tmp.substring(0, tmp.indexOf(yearResult.getDelimiter())));
+                            }).collect(Collectors.toSet());
+                    int monthS = year == yearStart ? monthStart : 1;
+                    int monthE = year == yearEnd ? monthEnd : 12;
+                    for (int month = monthS; month <= monthE; month++) {
+                        if (months.contains(month)) {
+                            String monthUrl = yearUrl + String.valueOf(month) + "/";
+                            Result monthResult = ResultParser.parse(NetUtils.getResponseAsString(monthUrl));
+                            if (monthResult.getCommonPrefixes() != null) {
+                                Set<Integer> days = monthResult.getCommonPrefixes().stream()
+                                        .map(p -> {
+                                            String tmp = p.replace(monthResult.getPrefix(), "");
+                                            return Integer.parseInt(tmp.substring(0, tmp.indexOf(monthResult.getDelimiter())));
                                         }).collect(Collectors.toSet());
-                                for (int sequence : sequences) {
-                                    String jsonTile = dayUrl + String.valueOf(sequence) + "/tileInfo.json";
-                                    jsonTile = jsonTile.replace("?delimiter=/&prefix=", "");
-                                    double clouds = getTileCloudPercentage(jsonTile);
-                                    if (clouds > this.cloudFilter) {
-                                        Calendar instance = new Calendar.Builder().setDate(year, month - 1, day).build();
-                                        Logger.getRootLogger().warn(
-                                                String.format("Tile %s from %s has %.2f %% clouds",
-                                                        tile, dateFormat.format(instance.getTime()), clouds));
-                                    } else {
-                                        String jsonProduct = dayUrl + String.valueOf(sequence) + "/productInfo.json";
-                                        jsonProduct = jsonProduct.replace("?delimiter=/&prefix=", "");
-                                        ProductDescriptor descriptor = parseProductJson(jsonProduct);
-                                        if (this.relativeOrbit == 0 ||
-                                                descriptor.getName().contains("_R" + String.format("%02d", this.relativeOrbit))) {
-                                            results.put(descriptor.getName(), descriptor);
+                                int dayS = month == monthS ? dayStart : 1;
+                                Calendar calendar = new Calendar.Builder().setDate(year, month + 1, 1).build();
+                                calendar.add(Calendar.DAY_OF_MONTH, -1);
+                                int dayE = month == monthE ? dayEnd : calendar.get(Calendar.DAY_OF_MONTH);
+                                for (int day = dayS; day <= dayE; day++) {
+                                    if (days.contains(day)) {
+                                        String dayUrl = monthUrl + String.valueOf(day) + "/";
+                                        Result dayResult = ResultParser.parse(NetUtils.getResponseAsString(dayUrl));
+                                        if (dayResult.getCommonPrefixes() != null) {
+                                            Set<Integer> sequences = dayResult.getCommonPrefixes().stream()
+                                                    .map(p -> {
+                                                        String tmp = p.replace(dayResult.getPrefix(), "");
+                                                        return Integer.parseInt(tmp.substring(0, tmp.indexOf(dayResult.getDelimiter())));
+                                                    }).collect(Collectors.toSet());
+                                            for (int sequence : sequences) {
+                                                String jsonTile = dayUrl + String.valueOf(sequence) + "/tileInfo.json";
+                                                jsonTile = jsonTile.replace("?delimiter=/&prefix=", "");
+                                                double clouds = getTileCloudPercentage(jsonTile);
+                                                if (clouds > this.cloudFilter) {
+                                                    Calendar instance = new Calendar.Builder().setDate(year, month - 1, day).build();
+                                                    Logger.getRootLogger().warn(
+                                                            String.format("Tile %s from %s has %.2f %% clouds",
+                                                                    tile, dateFormat.format(instance.getTime()), clouds));
+                                                } else {
+                                                    String jsonProduct = dayUrl + String.valueOf(sequence) + "/productInfo.json";
+                                                    jsonProduct = jsonProduct.replace("?delimiter=/&prefix=", "");
+                                                    ProductDescriptor descriptor = parseProductJson(jsonProduct);
+                                                    if (this.relativeOrbit == 0 ||
+                                                            descriptor.getName().contains("_R" + String.format("%02d", this.relativeOrbit))) {
+                                                        results.put(descriptor.getName(), descriptor);
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }

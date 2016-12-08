@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 public abstract class TileMap {
     protected final Map<String, Rectangle2D> tiles;
 
-    public TileMap() {
+    protected TileMap() {
         tiles = new TreeMap<>();
     }
 
@@ -94,6 +94,10 @@ public abstract class TileMap {
     }
 
     public abstract void fromKml(BufferedReader bufferedReader) throws IOException;
+
+    public List<String> getTileNames() {
+        return this.tiles.keySet().stream().collect(Collectors.toList());
+    }
 
     /**
      * Returns the number of tiles contained in this map

@@ -47,15 +47,16 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Main execution class.
+ * Executor execution class.
  *
  * @author Cosmin Cara
  */
-public class Main {
+public class Executor {
 
     private static Options options;
     private static Properties props;
     private static String version;
+    private static BatchProgressListener listener;
 
     static {
         options = new Options();
@@ -327,21 +328,32 @@ public class Main {
                 .build());
         props = new Properties();
         try {
-            props.load(Main.class.getResourceAsStream("download.properties"));
+            props.load(Executor.class.getResourceAsStream("download.properties"));
             version = props.getProperty("version");
         } catch (IOException ignored) {
         }
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 3) {
+        if (args.length == 0) {
             HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("ProductDownload-" + version, options);
             System.exit(0);
         }
-        int retCode = ReturnCode.OK;
         CommandLineParser parser = new DefaultParser();
         CommandLine commandLine = parser.parse(options, args);
+        System.exit(execute(commandLine));
+    }
+
+    public static int execute(String[] args) throws Exception {
+        CommandLineParser parser = new DefaultParser();
+        CommandLine commandLine = parser.parse(options, args);
+        return execute(commandLine);
+    }
+
+    private static int execute(CommandLine commandLine) throws Exception {
+        int retCode = ReturnCode.OK;
+        CommandLineParser parser = new DefaultParser();
         String logFile = props.getProperty("master.log.file");
         String folder;
         boolean debugMode = commandLine.hasOption(Constants.PARAM_VERBOSE);
@@ -354,7 +366,9 @@ public class Main {
             Utilities.ensureExists(Paths.get(folder));
             Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString(), debugMode);
             logger = Logger.getRootLogger();
-            printCommandLine(commandLine);
+            if (commandLine.hasOption(Constants.PARAM_VERBOSE)) {
+                printCommandLine(commandLine);
+            }
             if (sensorType == SensorType.L8) {
                 logger.warn("Argument --input will be ignored for Landsat8");
             } else {
@@ -450,9 +464,11 @@ public class Main {
                     logger.info(String.valueOf(tileMap.getCount() + " tiles found"));
                 }
             } else {
-                logger.info(String.format("Loading %s tiles extents", sensorType));
-                tileMap.read( Main.class.getResourceAsStream(sensorType + "tilemap.dat"));
-                logger.info(String.valueOf(tileMap.getCount() + " tile extents loaded"));
+                if (tileMap.getCount() == 0) {
+                    logger.info(String.format("Loading %s tiles extents", sensorType));
+                    tileMap.read(Executor.class.getResourceAsStream(sensorType + "tilemap.dat"));
+                    logger.info(String.valueOf(tileMap.getCount() + " tile extents loaded"));
+                }
             }
 
             if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
@@ -467,7 +483,7 @@ public class Main {
                 if (sensorType == SensorType.S2 && (!commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE) || ProductStore.SCIHUB.toString().equals(commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE))) &&
                         (uuids == null || uuids.length != productNames.length)) {
                     logger.error("For the list of product names a corresponding list of UUIDs has to be given!");
-                    System.exit(-1);
+                    return -1;
                 }
                 for (int i = 0; i < productNames.length; i++) {
                     ProductDescriptor productDescriptor = sensorType == SensorType.S2 ?
@@ -621,20 +637,25 @@ public class Main {
             if (downloader instanceof  SentinelProductDownloader) {
                 ((SentinelProductDownloader) downloader).setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
             }
+            downloader.setProgressListener(listener);
             retCode = downloader.downloadProducts(products);
         }
-        System.exit(retCode);
+        return retCode;
+    }
+
+    public static void setProgressListener(BatchProgressListener progressListener) {
+        listener = progressListener;
     }
 
     private static void printCommandLine(CommandLine cmd) {
-        Logger.getRootLogger().info("Executing with the following arguments:");
+        Logger.getRootLogger().debug("Executing with the following arguments:");
         for (Option option : cmd.getOptions()) {
             if (option.hasArgs()) {
-                Logger.getRootLogger().info(option.getOpt() + "=" + String.join(" ", option.getValues()));
+                Logger.getRootLogger().debug(option.getOpt() + "=" + String.join(" ", option.getValues()));
             } else if (option.hasArg()) {
-                Logger.getRootLogger().info(option.getOpt() + "=" + option.getValue());
+                Logger.getRootLogger().debug(option.getOpt() + "=" + option.getValue());
             } else {
-                Logger.getRootLogger().info(option.getOpt());
+                Logger.getRootLogger().debug(option.getOpt());
             }
         }
     }

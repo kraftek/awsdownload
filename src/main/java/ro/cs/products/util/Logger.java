@@ -89,6 +89,12 @@ public class Logger {
         return fileHandler;
     }
 
+    public static void registerHandler(Handler handler) {
+        handler.setFormatter(new LogFormatter());
+        handler.setLevel(logger.getLevel());
+        logger.addHandler(handler);
+    }
+
     private static void fine(String message, Object...args) {
         if (args != null && args.length > 0) {
             message = String.format(message, args);
