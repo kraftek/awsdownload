@@ -13,6 +13,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
+import javafx.scene.text.Font;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
@@ -31,38 +32,42 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
 public class ProductSearchDialog extends Application {
-    private static final String INVALID_VALUE_STYLE = "-fx-border-color: red;";
-    ChoiceBox<SensorType> productType;
-    ChoiceBox<ProductStore> searchProvider;
-    ChoiceBox<ProductStore> downloadStore;
-    ListView<String> lstTiles;
-    ListView<String> lstSelection;
-    TextField txtTarget;
-    Button btnBrowse;
-    TextField txtUser;
-    PasswordField txtPwd;
-    Slider sldClouds;
-    TextField txtRelOrbit;
-    DatePicker dpStart;
-    DatePicker dpEnd;
-    TextArea console;
-    Button btnExecute;
-    Label progressLabel;
-    ProgressBar progressBar;
 
+    private static final String INVALID_VALUE_STYLE = "-fx-border-color: red;";
+    private ChoiceBox<SensorType> productType;
+    private ChoiceBox<ProductStore> searchProvider;
+    private ChoiceBox<ProductStore> downloadStore;
+    private TextField txtTileFilter;
+    private ListView<String> lstTiles;
+    private ListView<String> lstSelection;
+    private TextField txtTarget;
+    private Button btnBrowse;
+    private TextField txtUser;
+    private PasswordField txtPwd;
+    private Slider sldClouds;
+    private TextField txtRelOrbit;
+    private DatePicker dpStart;
+    private DatePicker dpEnd;
+    private TextField txtResults;
+    private TextArea console;
+    private Button btnExecute;
+    private Label progressLabel;
+    private ProgressBar progressBar;
+    private Label fileProgressLabel;
+    private ProgressBar fileProgressBar;
+
+    private ObservableList<String> currentTiles;
     private Handler handler;
     private ExecutorService executorService;
-    private Stage stage;
 
     public static void main(String[] args) {
         launch(args);
@@ -70,7 +75,6 @@ public class ProductSearchDialog extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        this.stage = primaryStage;
         executorService = Executors.newSingleThreadExecutor();
         buildUI(primaryStage);
         primaryStage.setResizable(false);
@@ -78,17 +82,36 @@ public class ProductSearchDialog extends Application {
         try {
             load();
         } catch (IOException e) {
-            console.setText("[ERROR]\t" + e.getMessage());
+            console.setText("[err ] " + e.getMessage());
         }
+        Platform.setImplicitExit(true);
+        primaryStage.show();
+    }
+
+    @Override
+    public void stop() throws Exception {
+        cancel();
+        super.stop();
+        Platform.exit();
+    }
+
+    private void cancel() {
+        executorService.shutdownNow();
     }
 
     private void registerHandler() {
         if (handler == null) {
             handler = new Handler() {
+                final Map<Level, String> levels = new HashMap<Level, String>() {{
+                    put(Level.INFO, "info");
+                    put(Level.WARNING, "warn");
+                    put(Level.SEVERE, "err ");
+                    put(Level.FINE, "dbg ");
+                }};
                 @Override
                 public void publish(LogRecord record) {
                     Platform.runLater(() -> {
-                        console.appendText("[" + record.getLevel().getName() + "]\t" + record.getMessage() + "\n");
+                        console.appendText("[" + levels.get(record.getLevel()) + "] " + record.getMessage() + "\n");
                     });
                 }
 
@@ -106,7 +129,7 @@ public class ProductSearchDialog extends Application {
 
     private void buildUI(Stage stage) {
         Group group = new Group();
-        Scene scene = new Scene(group, 560, 480);
+        Scene scene = new Scene(group, 560, 440);
         stage.setScene(scene);
         stage.setTitle("Product Download");
 
@@ -147,9 +170,10 @@ public class ProductSearchDialog extends Application {
             Platform.runLater(() -> {
                     try {
                         theMap.read(Executor.class.getResourceAsStream(newValue.toString() + "tilemap.dat"));
-                        lstTiles.setItems(FXCollections.observableArrayList(theMap.getTileNames()));
+                        currentTiles = FXCollections.observableArrayList(theMap.getTileNames());
+                        lstTiles.setItems(currentTiles);
                     } catch (IOException e) {
-                        console.appendText("[ERROR]: " + e.getMessage());
+                        console.appendText("[err ] " + e.getMessage());
                     }
                 });
         });
@@ -157,6 +181,16 @@ public class ProductSearchDialog extends Application {
         grid.add(productType, 2, 0, 1, 1);
 
         grid.add(new Label("Tiles:"), 4, 0, 1, 1);
+        txtTileFilter = new TextField();
+        txtTileFilter.setPromptText("filter");
+        txtTileFilter.textProperty().addListener((observable, oldValue, newValue) -> {
+                if (newValue != null && !newValue.isEmpty()) {
+                    lstTiles.setItems(currentTiles.filtered(s -> s.startsWith(newValue)));
+                } else {
+                    lstTiles.setItems(currentTiles);
+                }
+            });
+        grid.add(txtTileFilter, 5, 0, 2, 1);
         lstTiles.setPrefWidth(80);
         lstTiles.setPrefHeight(70);
         lstTiles.setOnMouseClicked(event -> {
@@ -167,9 +201,9 @@ public class ProductSearchDialog extends Application {
                 }
             }
         });
-        grid.add(lstTiles, 5, 0, 2, 3);
+        grid.add(lstTiles, 5, 1, 2, 2);
 
-        grid.add(new Label("Selection:"), 7, 0, 1, 1);
+        grid.add(new Label("Selected:"), 7, 0, 1, 1);
         lstSelection = new ListView<>();
         lstSelection.setPrefWidth(80);
         lstSelection.setPrefHeight(70);
@@ -254,6 +288,19 @@ public class ProductSearchDialog extends Application {
             }
         });
         grid.add(txtRelOrbit, 6, 5, 2, 1);
+        txtResults = new TextField("100");
+        txtResults.setPromptText("Limit");
+        txtResults.setAlignment(Pos.CENTER_RIGHT);
+        txtResults.focusedProperty().addListener((observable, oldValue, newValue) -> {
+            if (!txtResults.getText().isEmpty() && !txtResults.getText().matches("\\d{1,4}")) {
+                txtResults.setStyle(INVALID_VALUE_STYLE);
+                txtResults.setPromptText("NaN");
+            } else {
+                txtResults.setStyle(null);
+            }
+        });
+        grid.add(new Label("Results:"), 8, 5, 1, 1);
+        grid.add(txtResults, 9, 5, 1, 1);
 
         grid.add(new Label("Sensing Start:"), 0, 6, 2, 1);
         dpStart = new DatePicker(LocalDate.now().minusDays(7));
@@ -269,6 +316,7 @@ public class ProductSearchDialog extends Application {
 
         console = new TextArea();
         console.setPromptText("output of the execution");
+        console.setFont(Font.font(9));
         console.setEditable(false);
         grid.add(console, 0, 7, 10, 2);
 
@@ -277,32 +325,59 @@ public class ProductSearchDialog extends Application {
         grid.add(progressLabel, 0, 9, 2, 1);
         progressBar = new ProgressBar();
         progressBar.setVisible(false);
-        progressBar.setPrefWidth(300);
+        progressBar.setPrefWidth(120);
+        grid.add(progressBar, 2, 9, 3, 1);
 
-        grid.add(progressBar, 2, 9, 7, 1);
+        fileProgressLabel = new Label("Curr. File:");
+        fileProgressLabel.setVisible(false);
+        grid.add(fileProgressLabel, 5, 9, 2, 1);
+        fileProgressBar = new ProgressBar();
+        fileProgressBar.setVisible(false);
+        fileProgressBar.setPrefWidth(120);
+        grid.add(fileProgressBar, 7, 9, 2, 1);
 
         btnExecute = new Button("Execute");
+        btnExecute.setUserData(Boolean.TRUE);
         btnExecute.setOnAction(event -> {
-            if (canExecute()) {
+            if ((Boolean) btnExecute.getUserData()) {
+                if (canExecute()) {
+                    try {
+                        btnExecute.setText("Cancel");
+                        btnExecute.setUserData(Boolean.FALSE);
+                        progressBar.setProgress(0);
+                        fileProgressBar.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
+                        toggleControls(true);
+                        console.clear();
+                        Executor.setProgressListener(value -> Platform.runLater(() -> {
+                            progressBar.setProgress(value);
+                        }));
+                        Executor.setFileProgressListener((value, rate) -> Platform.runLater(() -> {
+                            fileProgressBar.setProgress(value);
+                            double dlRate = rate;
+                            if (Double.isInfinite(dlRate) || Double.isNaN(dlRate)) {
+                                dlRate = 0;
+                            }
+                            fileProgressLabel.setText(String.format("Cur. File: [%.2fM/s]", dlRate));
+                        }));
+                        executorService.submit(new DownloadTask(prepareArguments(), ProductSearchDialog.this::onExecutionCompleted));
+                    } catch (Exception e) {
+                        console.appendText("[err ] " + e.getMessage() + "\n");
+                    }
+                }
+            } else {
                 try {
-                    progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
-                    toggleControls(true);
+                    cancel();
+                } finally {
                     console.clear();
-                    Executor.setProgressListener(value -> Platform.runLater(() -> {
-                        progressBar.setProgress(value);
-                    }));
-                    executorService.submit(new DownloadTask(prepareArguments(), ProductSearchDialog.this::onExecutionCompleted));
-                } catch (Exception e) {
-                    console.appendText("[ERROR] " + e.getMessage() + "\n");
+                    toggleControls(false);
+                    btnExecute.setText("Execute");
+                    btnExecute.setUserData(Boolean.TRUE);
                 }
             }
         });
 
         grid.add(btnExecute, 9, 9, 2, 1);
-
         scene.setRoot(grid);
-
-        stage.show();
     }
 
     private void toggleControls(boolean executing) {
@@ -319,18 +394,25 @@ public class ProductSearchDialog extends Application {
         txtRelOrbit.setDisable(executing);
         dpStart.setDisable(executing);
         dpEnd.setDisable(executing);
-        btnExecute.setDisable(executing);
+        //btnExecute.setDisable(executing);
         progressLabel.setVisible(executing);
         progressBar.setVisible(executing);
+        fileProgressLabel.setVisible(executing);
+        fileProgressBar.setVisible(executing);
+        txtResults.setDisable(executing);
     }
 
     private void onExecutionCompleted(int returnCode) {
-        toggleControls(false);
-        progressBar.setProgress(0);
+        Platform.runLater(() -> {
+            toggleControls(false);
+            progressBar.setProgress(0);
+            btnExecute.setText("Execute");
+            btnExecute.setUserData(Boolean.TRUE);
+        });
         try {
             save();
         } catch (IOException e) {
-            console.appendText("[ERROR] " + e.getMessage() + "\n");
+            console.appendText("[err] " + e.getMessage() + "\n");
         }
     }
 
@@ -379,6 +461,17 @@ public class ProductSearchDialog extends Application {
             properties.put("relative.orbit", txtRelOrbit.getText());
         } catch (NumberFormatException ignored) {
         }
+        if (dpStart.getValue() != null) {
+            properties.put("startdate", dpStart.getValue().toString());
+        }
+        if (dpEnd.getValue() != null) {
+            properties.put("enddate", dpEnd.getValue().toString());
+        }
+        try {
+            Integer.parseInt(txtResults.getText());
+            properties.put("limit", txtResults.getText());
+        } catch (NumberFormatException ignored) {
+        }
         properties.store(Files.newOutputStream(Paths.get("").toAbsolutePath().resolve("parameters.properties")), "");
     }
 
@@ -415,6 +508,15 @@ public class ProductSearchDialog extends Application {
             if ((value = properties.getOrDefault("relative.orbit", null)) != null) {
                 txtRelOrbit.setText(value.toString());
             }
+            if ((value = properties.getOrDefault("startdate", null)) != null) {
+                dpStart.setValue(new DateConverter().fromString(value.toString()));
+            }
+            if ((value = properties.getOrDefault("enddate", null)) != null) {
+                dpEnd.setValue(new DateConverter().fromString(value.toString()));
+            }
+            if ((value = properties.getOrDefault("limit", null)) != null) {
+                txtResults.setText(value.toString());
+            }
         }
     }
 
@@ -447,6 +549,20 @@ public class ProductSearchDialog extends Application {
             Integer.parseInt(txtRelOrbit.getText());
             args.add("--relative.orbit");
             args.add(txtRelOrbit.getText());
+        } catch (NumberFormatException ignored) {
+        }
+        if (dpStart.getValue() != null) {
+            args.add("--startdate");
+            args.add(new DateConverter().toString(dpStart.getValue()));
+        }
+        if (dpEnd.getValue() != null) {
+            args.add("--enddate");
+            args.add(new DateConverter().toString(dpEnd.getValue()));
+        }
+        try {
+            Integer.parseInt(txtResults.getText());
+            args.add("--limit");
+            args.add(txtResults.getText());
         } catch (NumberFormatException ignored) {
         }
         return args.toArray(new String[args.size()]);

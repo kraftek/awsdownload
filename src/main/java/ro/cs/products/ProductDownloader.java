@@ -54,7 +54,8 @@ public abstract class ProductDownloader {
 
     protected Logger.ScopeLogger productLogger;
 
-    protected BatchProgressListener listener;
+    protected BatchProgressListener batchProgressListener;
+    protected ProgressListener fileProgressListener;
 
     public ProductDownloader(String targetFolder, Properties properties) {
         this.destination = targetFolder;
@@ -62,8 +63,10 @@ public abstract class ProductDownloader {
     }
 
     public void setProgressListener(BatchProgressListener listener) {
-        this.listener = listener;
+        this.batchProgressListener = listener;
     }
+
+    public void setFileProgressListener(ProgressListener listener) { this.fileProgressListener = listener; }
 
     int downloadProducts(List<ProductDescriptor> products) {
         int retCode = ReturnCode.OK;
@@ -99,8 +102,8 @@ public abstract class ProductDownloader {
                 if (file != null && Files.exists(file)) {
                     getLogger().info("Product download completed in %s", Utilities.formatTime(millis));
                 }
-                if (listener != null) {
-                    listener.notifyProgress((double) productCounter / (double) productCount);
+                if (batchProgressListener != null) {
+                    batchProgressListener.notifyProgress((double) productCounter / (double) productCount);
                 }
             }
         }
@@ -150,6 +153,9 @@ public abstract class ProductDownloader {
                 InputStream inputStream = null;
                 OutputStream outputStream = null;
                 try {
+                    if (this.fileProgressListener != null) {
+                        this.fileProgressListener.notifyProgress(0, 0);
+                    }
                     tmpFile = Files.createTempFile(file.getParent(), "tmp", null);
                     Logger.getRootLogger().debug("Local temporary file %s created", tmpFile.toString());
                     long start = System.currentTimeMillis();
@@ -157,12 +163,20 @@ public abstract class ProductDownloader {
                     outputStream = Files.newOutputStream(tmpFile);
                     byte[] buffer = new byte[BUFFER_SIZE];
                     int read;
+                    int totalRead = 0;
+                    long millis;
                     Logger.getRootLogger().debug("Begin reading from input stream");
                     while ((read = inputStream.read(buffer)) != -1) {
                         outputStream.write(buffer, 0, read);
-                        outputStream.flush();
-                        Thread.yield();
+                        totalRead += read;
+                        //Thread.yield();
+                        if (this.fileProgressListener != null) {
+                            millis = (System.currentTimeMillis() - start) / 1000;
+                            this.fileProgressListener.notifyProgress((double) totalRead / (double) remoteFileLength,
+                                    (double) (totalRead / 1024 / 1024) / (double) millis);
+                        }
                     }
+                    outputStream.flush();
                     Logger.getRootLogger().debug("End reading from input stream");
                     Files.deleteIfExists(file);
                     Files.move(tmpFile, file);

@@ -56,7 +56,8 @@ public class Executor {
     private static Options options;
     private static Properties props;
     private static String version;
-    private static BatchProgressListener listener;
+    private static BatchProgressListener batchProgressListener;
+    private static ProgressListener fileProgressListener;
 
     static {
         options = new Options();
@@ -637,15 +638,18 @@ public class Executor {
             if (downloader instanceof  SentinelProductDownloader) {
                 ((SentinelProductDownloader) downloader).setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
             }
-            downloader.setProgressListener(listener);
+            downloader.setProgressListener(batchProgressListener);
+            downloader.setFileProgressListener(fileProgressListener);
             retCode = downloader.downloadProducts(products);
         }
         return retCode;
     }
 
     public static void setProgressListener(BatchProgressListener progressListener) {
-        listener = progressListener;
+        batchProgressListener = progressListener;
     }
+
+    public static void setFileProgressListener(ProgressListener progressListener) { fileProgressListener = progressListener; }
 
     private static void printCommandLine(CommandLine cmd) {
         Logger.getRootLogger().debug("Executing with the following arguments:");
