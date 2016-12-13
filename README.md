@@ -20,6 +20,10 @@ Filtering on products is mutually exclusive with filtering on an area of interes
 #Binaries
 The latest binaries can be found at https://github.com/kraftek/awsdownload/releases/.
 
+Starting with version 1.3-beta, there is also a GUI mode of the downloader.
+The script files "launch-gui.bat"/"launch-gui.sh" should be run in order to launch the graphical interface.
+For the non-gui mode, the execution is done like in the previous versions.
+
 #How to use it with Git and Maven:
 1. Locally clone the repository
     git clone https://github.com/kraftek/awsdownload.git
