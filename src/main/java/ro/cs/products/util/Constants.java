@@ -72,4 +72,16 @@ public class Constants {
     public static final String PARAM_PROXY_USER = "puser";
     public static final String PARAM_PROXY_PASSWORD = "ppwd";
     public static final String PARAM_GUI = "gui";
+    public static final String PSD_13 = "13";
+    public static final String PSD_14 = "14";
+    public static final String XML_ATTR_GRANULE_ID = "granuleIdentifier";
+    public static final String XML_ATTR_DATASTRIP_ID = "datastripIdentifier";
+    public static final String ODATA_UUID = "${UUID}";
+    public static final String ODATA_PRODUCT_NAME = "${PRODUCT_NAME}";
+    public static final String ODATA_XML_PLACEHOLDER = "${xmlname}";
+    public static final String FOLDER_GRANULE = "GRANULE";
+    public static final String FOLDER_AUXDATA = "AUX_DATA";
+    public static final String FOLDER_DATASTRIP = "DATASTRIP";
+    public static final String FOLDER_IMG_DATA = "IMG_DATA";
+    public static final String FOLDER_QI_DATA = "QI_DATA";
 }

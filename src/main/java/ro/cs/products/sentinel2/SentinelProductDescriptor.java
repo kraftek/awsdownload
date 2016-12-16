@@ -17,6 +17,7 @@ package ro.cs.products.sentinel2;
 
 import ro.cs.products.ProductDownloader;
 import ro.cs.products.base.ProductDescriptor;
+import ro.cs.products.util.Constants;
 import ro.cs.products.util.Logger;
 
 import java.text.ParseException;
@@ -44,13 +45,13 @@ public class SentinelProductDescriptor extends ProductDescriptor {
 
     public SentinelProductDescriptor(String name) {
         super(name);
-        this.version = this.oldFormat ? "13" : "14";
+        this.version = this.oldFormat ? Constants.PSD_13 : Constants.PSD_14;
     }
 
     @Override
     public String getVersion() {
         if (this.version == null) {
-            this.version = this.oldFormat ? "13" : "14";
+            this.version = this.oldFormat ? Constants.PSD_13 : Constants.PSD_14;;
         }
         return this.version;
     }

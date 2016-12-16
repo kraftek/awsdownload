@@ -66,7 +66,7 @@ public class Utilities {
         String value = null;
         String granuleIdentifier;
         switch (psdVersion) {
-            case "13" :
+            case Constants.PSD_13 :
                 for (String line : input) {
                     granuleIdentifier = getAttributeValue(line, "granuleIdentifier");
                     if (granuleIdentifier.contains(filter)) {
@@ -75,7 +75,7 @@ public class Utilities {
                     }
                 }
                 break;
-            case "14":
+            case Constants.PSD_14:
                 String datastripIdentifier;
                 for (String line : input) {
                     granuleIdentifier = getAttributeValue(line, "granuleIdentifier");
