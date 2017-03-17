@@ -30,7 +30,14 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -124,7 +131,7 @@ public class AmazonSearch extends AbstractSearch {
                                                     jsonProduct = jsonProduct.replace("?delimiter=/&prefix=", "");
                                                     ProductDescriptor descriptor = parseProductJson(jsonProduct);
                                                     if (this.relativeOrbit == 0 ||
-                                                            descriptor.getName().contains("_R" + String.format("%02d", this.relativeOrbit))) {
+                                                            descriptor.getName().contains("_R" + String.format("%03d", this.relativeOrbit))) {
                                                         results.put(descriptor.getName(), descriptor);
                                                     }
                                                 }
