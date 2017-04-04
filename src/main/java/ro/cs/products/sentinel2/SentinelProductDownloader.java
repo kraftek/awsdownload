@@ -267,12 +267,17 @@ public class SentinelProductDownloader extends ProductDownloader {
                                     int secondTagBeginIdx = line.indexOf("<", firstTagCloseIdx);
                                     String maskFileName = line.substring(firstTagCloseIdx, secondTagBeginIdx);
                                     maskFileName = maskFileName.substring(maskFileName.lastIndexOf(URL_SEPARATOR) + 1);
-                                    downloadFile(pathBuilder.root(tileUrl)
-                                                            .node(Constants.FOLDER_QI_DATA)
-                                                            .node(maskFileName)
-                                                            .value(),
-                                            qiData.resolve(maskFileName),
-                                            NetUtils.getAuthToken());
+                                    final String mfn = maskFileName;
+                                    if (this.bands == null || this.bands.stream().anyMatch(mfn::contains)) {
+                                        downloadFile(pathBuilder.root(tileUrl)
+                                                             .node(Constants.FOLDER_QI_DATA)
+                                                             .node(maskFileName)
+                                                             .value(),
+                                                     qiData.resolve(maskFileName),
+                                                     NetUtils.getAuthToken());
+                                    } else {
+                                        getLogger().info("Mask %s skipped", mfn);
+                                    }
                                 }
                                 getLogger().info("Tile download completed in %s", Utilities.formatTime(System.currentTimeMillis() - start));
                             } else {
@@ -406,23 +411,27 @@ public class SentinelProductDownloader extends ProductDownloader {
                                 int firstTagCloseIdx = line.indexOf(">") + 1;
                                 int secondTagBeginIdx = line.indexOf("<", firstTagCloseIdx);
                                 String maskFileName = line.substring(firstTagCloseIdx, secondTagBeginIdx);
-                                String remoteName;
-                                Path path;
-                                if (Constants.PSD_13.equals(product.getVersion())) {
-                                    String[] tokens = maskFileName.split(NAME_SEPARATOR);
-                                    remoteName = tokens[2] + NAME_SEPARATOR + tokens[3] + NAME_SEPARATOR + tokens[9] + ".gml";
-                                    path = qiData.resolve(maskFileName);
-                                } else {
-                                    remoteName = maskFileName.substring(maskFileName.lastIndexOf(URL_SEPARATOR) + 1);
-                                    path = rootPath.resolve(maskFileName);
-                                }
+                                if (this.bands == null || this.bands.stream().anyMatch(maskFileName::contains)) {
+                                    String remoteName;
+                                    Path path;
+                                    if (Constants.PSD_13.equals(product.getVersion())) {
+                                        String[] tokens = maskFileName.split(NAME_SEPARATOR);
+                                        remoteName = tokens[2] + NAME_SEPARATOR + tokens[3] + NAME_SEPARATOR + tokens[9] + ".gml";
+                                        path = qiData.resolve(maskFileName);
+                                    } else {
+                                        remoteName = maskFileName.substring(maskFileName.lastIndexOf(URL_SEPARATOR) + 1);
+                                        path = rootPath.resolve(maskFileName);
+                                    }
 
-                                try {
-                                    String fileUrl = tileUrl + "/qi/" + remoteName;
-                                    getLogger().debug("Downloading file %s from %s", path, fileUrl);
-                                    downloadFile(fileUrl, path);
-                                } catch (IOException ex) {
-                                    getLogger().warn("Download for %s failed [%s]", path, ex.getMessage());
+                                    try {
+                                        String fileUrl = tileUrl + "/qi/" + remoteName;
+                                        getLogger().debug("Downloading file %s from %s", path, fileUrl);
+                                        downloadFile(fileUrl, path);
+                                    } catch (IOException ex) {
+                                        getLogger().warn("Download for %s failed [%s]", path, ex.getMessage());
+                                    }
+                                } else {
+                                    getLogger().info("Mask %s skipped", maskFileName);
                                 }
                             }
                             getLogger().debug("Trying to download %s", tileUrl + "/auxiliary/ECMWFT");
