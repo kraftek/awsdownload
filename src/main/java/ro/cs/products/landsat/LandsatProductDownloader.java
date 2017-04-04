@@ -77,22 +77,25 @@ public class LandsatProductDownloader extends ProductDownloader {
         if (metadataFile != null && Files.exists(metadataFile)) {
 
             for (String suffix : bandFiles) {
-                String bandFileName = productName + suffix;
-                currentStep = "Band " + bandFileName;
-                try {
-                    String bandFileUrl = getProductUrl(product) + bandFileName;
-                    Path path = rootPath.resolve(bandFileName);
-                    getLogger().debug("Downloading band raster %s from %s", path, bandFileUrl);
-                    downloadFile(bandFileUrl, path);
-                } catch (IOException ex) {
-                    getLogger().warn("Download for %s failed [%s]", bandFileName, ex.getMessage());
+                String bandName = suffix.substring(1, suffix.indexOf("."));
+                if (this.bands == null || this.bands.contains(bandName)) {
+                    String bandFileName = productName + suffix;
+                    currentStep = "Band " + bandFileName;
+                    try {
+                        String bandFileUrl = getProductUrl(product) + bandFileName;
+                        Path path = rootPath.resolve(bandFileName);
+                        getLogger().debug("Downloading band raster %s from %s", path, bandFileUrl);
+                        downloadFile(bandFileUrl, path);
+                    } catch (IOException ex) {
+                        getLogger().warn("Download for %s failed [%s]", bandFileName, ex.getMessage());
+                    }
                 }
             }
         } else {
             getLogger().warn("Either the product %s was not found or the metadata file could not be downloaded", productName);
             rootPath = null;
         }
-        if (shouldCompress) {
+        if (shouldCompress && rootPath != null) {
             getLogger().info("Compressing product %s", product);
             Zipper.compress(rootPath, rootPath.getFileName().toString(), shouldDeleteAfterCompression);
         }

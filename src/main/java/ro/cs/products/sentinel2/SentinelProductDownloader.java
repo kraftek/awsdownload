@@ -19,7 +19,11 @@ import ro.cs.products.ProductDownloader;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.sentinel2.workaround.FillAnglesMethod;
 import ro.cs.products.sentinel2.workaround.MetadataRepairer;
-import ro.cs.products.util.*;
+import ro.cs.products.util.Constants;
+import ro.cs.products.util.Logger;
+import ro.cs.products.util.NetUtils;
+import ro.cs.products.util.Utilities;
+import ro.cs.products.util.Zipper;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -34,7 +38,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -128,6 +139,17 @@ public class SentinelProductDownloader extends ProductDownloader {
 
     public void setFillMissingAnglesMethod(FillAnglesMethod value) {
         this.fillMissingAnglesMethod = value;
+    }
+
+    @Override
+    public void setBandList(String[] bands) {
+        if (bands != null) {
+            this.bands = new HashSet<>();
+            for (String band : bands) {
+                this.bands.add(band);
+                this.bands.add(band.substring(0, 1) + String.format("%02d", Integer.parseInt(band.substring(1))));
+            }
+        }
     }
 
     @Override
@@ -225,12 +247,16 @@ public class SentinelProductDownloader extends ProductDownloader {
                             if (Files.exists(tileMetaFile)) {
                                 List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
                                 for (String bandFileName : bandFiles) {
-                                    downloadFile(pathBuilder.root(tileUrl)
-                                                            .node(Constants.FOLDER_IMG_DATA)
-                                                            .node(product.getBandFileName(granuleId, bandFileName))
-                                                            .value(),
-                                            imgData.resolve(product.getBandFileName(granuleId, bandFileName)),
-                                            NetUtils.getAuthToken());
+                                    if (this.bands == null || this.bands.contains(bandFileName.substring(0, bandFileName.indexOf(".")))) {
+                                        downloadFile(pathBuilder.root(tileUrl)
+                                                             .node(Constants.FOLDER_IMG_DATA)
+                                                             .node(product.getBandFileName(granuleId, bandFileName))
+                                                             .value(),
+                                                     imgData.resolve(product.getBandFileName(granuleId, bandFileName)),
+                                                     NetUtils.getAuthToken());
+                                    } else {
+                                        getLogger().info("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
+                                    }
                                 }
                                 List<String> lines = Utilities.filter(tileMetadataLines, "<MASK_FILENAME");
                                 for (String line : lines) {
@@ -359,13 +385,17 @@ public class SentinelProductDownloader extends ProductDownloader {
                             Path tileMetaFile = downloadFile(tileUrl + "/metadata.xml", tileFolder.resolve(metadataName));
                             List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
                             for (String bandFileName : bandFiles) {
-                                try {
-                                    String bandFileUrl = tileUrl + URL_SEPARATOR + bandFileName;
-                                    Path path = imgData.resolve(product.getBandFileName(tileName, bandFileName)); //imgData.resolve(refName + NAME_SEPARATOR + bandFileName);
-                                    getLogger().debug("Downloading band raster %s from %s", path, bandFileName);
-                                    downloadFile(bandFileUrl, path);
-                                } catch (IOException ex) {
-                                    getLogger().warn("Download for %s failed [%s]", bandFileName, ex.getMessage());
+                                if (this.bands == null || this.bands.contains(bandFileName.substring(0, bandFileName.indexOf(".")))) {
+                                    try {
+                                        String bandFileUrl = tileUrl + URL_SEPARATOR + bandFileName;
+                                        Path path = imgData.resolve(product.getBandFileName(tileName, bandFileName)); //imgData.resolve(refName + NAME_SEPARATOR + bandFileName);
+                                        getLogger().debug("Downloading band raster %s from %s", path, bandFileName);
+                                        downloadFile(bandFileUrl, path);
+                                    } catch (IOException ex) {
+                                        getLogger().warn("Download for %s failed [%s]", bandFileName, ex.getMessage());
+                                    }
+                                } else {
+                                    getLogger().info("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
                                 }
                             }
                             List<String> lines = Utilities.filter(tileMetadataLines, "<MASK_FILENAME");

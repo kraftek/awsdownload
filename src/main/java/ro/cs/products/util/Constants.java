@@ -24,6 +24,7 @@ public class Constants {
     public static final String PARAM_AREA = "a";
     public static final String PARAM_TILE_LIST = "t";
     public static final String PARAM_PRODUCT_LIST = "p";
+    public static final String PARAM_BAND_LIST = "b";
     public static final String PARAM_PRODUCT_UUID_LIST = "uuid";
     public static final String PARAM_OUT_FOLDER = "o";
     public static final String PARAM_INPUT_FOLDER = "i";

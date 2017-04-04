@@ -15,7 +15,14 @@
  */
 package ro.cs.products;
 
-import org.apache.commons.cli.*;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.MissingOptionException;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.OptionGroup;
+import org.apache.commons.cli.Options;
 import ro.cs.products.base.AbstractSearch;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.base.SensorType;
@@ -32,7 +39,12 @@ import ro.cs.products.sentinel2.amazon.AmazonSearch;
 import ro.cs.products.sentinel2.scihub.SciHubSearch;
 import ro.cs.products.sentinel2.workaround.FillAnglesMethod;
 import ro.cs.products.sentinel2.workaround.ProductInspector;
-import ro.cs.products.util.*;
+import ro.cs.products.util.Constants;
+import ro.cs.products.util.Logger;
+import ro.cs.products.util.NetUtils;
+import ro.cs.products.util.Polygon2D;
+import ro.cs.products.util.ReturnCode;
+import ro.cs.products.util.Utilities;
 
 import java.awt.geom.Rectangle2D;
 import java.io.IOException;
@@ -43,7 +55,14 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -162,6 +181,15 @@ public class Executor {
                 .longOpt("uuid")
                 .argName("uuid1 uui2 ...")
                 .desc("A list of S2 product unique identifiers, as retrieved from SciHub, space-separated")
+                .hasArgs()
+                .optionalArg(true)
+                .valueSeparator(' ')
+                .build());
+        /* Band list */
+        options.addOption(Option.builder(Constants.PARAM_BAND_LIST)
+                .longOpt("bands")
+                .argName("band1 band2 ...")
+                .desc("The list of S2/L8 band names, space-separated, to be downloaded")
                 .hasArgs()
                 .optionalArg(true)
                 .valueSeparator(' ')
@@ -637,6 +665,9 @@ public class Executor {
             }
             if (downloader instanceof  SentinelProductDownloader) {
                 ((SentinelProductDownloader) downloader).setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
+            }
+            if (commandLine.hasOption(Constants.PARAM_BAND_LIST)) {
+                downloader.setBandList(commandLine.getOptionValues(Constants.PARAM_BAND_LIST));
             }
             downloader.setProgressListener(batchProgressListener);
             downloader.setFileProgressListener(fileProgressListener);
