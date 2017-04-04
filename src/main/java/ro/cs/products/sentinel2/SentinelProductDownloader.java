@@ -147,7 +147,9 @@ public class SentinelProductDownloader extends ProductDownloader {
             this.bands = new HashSet<>();
             for (String band : bands) {
                 this.bands.add(band);
-                this.bands.add(band.substring(0, 1) + String.format("%02d", Integer.parseInt(band.substring(1))));
+                if (band.substring(1).length() == 1) {
+                    this.bands.add(band.substring(0, 1) + String.format("%02d", Integer.parseInt(band.substring(1))));
+                }
             }
         }
     }
