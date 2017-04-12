@@ -66,6 +66,7 @@ public class Constants {
     public static final String LEVEL_4 = "            ";
     public static final String PARAM_FILL_ANGLES = "ma";
     public static final String PARAM_VERBOSE = "v";
+    public static final String PARAM_SEARCH_ONLY = "q";
     public static final String SEARCH_PARAM_RELATIVE_ORBIT_NUMBER = "relativeOrbitNumber";
     public static final String PARAM_PROXY_TYPE = "ptype";
     public static final String PARAM_PROXY_HOST = "phost";

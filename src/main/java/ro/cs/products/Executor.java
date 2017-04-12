@@ -50,6 +50,7 @@ import java.awt.geom.Rectangle2D;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -317,6 +318,14 @@ public class Executor {
                 .hasArg(false)
                 .optionalArg(true)
                 .build());
+        /* Mode (full/search) */
+        options.addOption(Option.builder(Constants.PARAM_SEARCH_ONLY)
+                  .longOpt("query")
+                  .argName("query")
+                  .desc("Only perform query and return product names")
+                  .hasArg(false)
+                  .optionalArg(true)
+                  .build());
         /*
          * Proxy parameters
          */
@@ -382,10 +391,10 @@ public class Executor {
 
     private static int execute(CommandLine commandLine) throws Exception {
         int retCode = ReturnCode.OK;
-        CommandLineParser parser = new DefaultParser();
         String logFile = props.getProperty("master.log.file");
         String folder;
         boolean debugMode = commandLine.hasOption(Constants.PARAM_VERBOSE);
+        boolean searchMode = commandLine.hasOption(Constants.PARAM_SEARCH_ONLY);
         Logger.CustomLogger logger;
         SensorType sensorType = commandLine.hasOption(Constants.SENSOR) ?
                 Enum.valueOf(SensorType.class, commandLine.getOptionValue(Constants.SENSOR)) :
@@ -660,18 +669,28 @@ public class Executor {
                 }
                 searchProvider.setClouds(clouds);
                 products = searchProvider.execute();
+                if (searchMode) {
+                    Path resultFile = Paths.get(folder).resolve("results.txt");
+                    Files.write(resultFile,
+                                products.stream()
+                                        .map(ProductDescriptor::getName)
+                                        .collect(Collectors.toList())
+                                );
+                }
             } else {
                 logger.debug("Product name(s) present, no additional search will be performed.");
             }
-            if (downloader instanceof  SentinelProductDownloader) {
-                ((SentinelProductDownloader) downloader).setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
+            if (!searchMode) {
+                if (downloader instanceof SentinelProductDownloader) {
+                    ((SentinelProductDownloader) downloader).setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
+                }
+                if (commandLine.hasOption(Constants.PARAM_BAND_LIST)) {
+                    downloader.setBandList(commandLine.getOptionValues(Constants.PARAM_BAND_LIST));
+                }
+                downloader.setProgressListener(batchProgressListener);
+                downloader.setFileProgressListener(fileProgressListener);
+                retCode = downloader.downloadProducts(products);
             }
-            if (commandLine.hasOption(Constants.PARAM_BAND_LIST)) {
-                downloader.setBandList(commandLine.getOptionValues(Constants.PARAM_BAND_LIST));
-            }
-            downloader.setProgressListener(batchProgressListener);
-            downloader.setFileProgressListener(fileProgressListener);
-            retCode = downloader.downloadProducts(products);
         }
         return retCode;
     }
