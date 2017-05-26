@@ -23,7 +23,9 @@ import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import ro.cs.products.base.AbstractSearch;
 import ro.cs.products.base.ProductDescriptor;
-import ro.cs.products.sentinel2.SentinelProductDescriptor;
+import ro.cs.products.sentinel2.ProductType;
+import ro.cs.products.sentinel2.S2L1CProductDescriptor;
+import ro.cs.products.sentinel2.S2L2AProductDescriptor;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.NetUtils;
 
@@ -37,16 +39,20 @@ import java.util.List;
  *
  * @author Cosmin Cara
  */
-public class SciHubSearch extends AbstractSearch {
+public class SciHubSearch extends AbstractSearch<ProductType> {
 
     private String filter;
     private List<NameValuePair> params;
     //private CredentialsProvider credsProvider;
     private UsernamePasswordCredentials credentials;
 
-    public SciHubSearch(String url) throws URISyntaxException {
+    public SciHubSearch(String url, ProductType type) throws URISyntaxException {
         super(url);
+        this.productType = type;
         this.filter = "platformName:Sentinel-2";
+        if (this.productType != null) {
+            this.filter = "(" + this.filter + " AND producttype:" + this.productType.toString() + ")";
+        }
         this.params = new ArrayList<>();
     }
 
@@ -94,6 +100,24 @@ public class SciHubSearch extends AbstractSearch {
         return this;
     }
 
+    @Override
+    public void setProductType(ProductType type) {
+        super.setProductType(type);
+        if (this.productType != null) {
+            int idx = this.filter.indexOf("productType");
+            if (idx > 0) {
+                int idx2 = this.filter.indexOf(")", idx);
+                this.filter = this.filter.substring(0, idx)
+                        + "productType:" + this.productType.toString() + this.filter.substring(idx2);
+            } else {
+                idx = this.filter.indexOf("platformName");
+                int idx2 = this.filter.indexOf("2", idx);
+                this.filter = this.filter.substring(0, idx) + "(platformName:Sentinel-2 AND productType:" +
+                        this.productType.toString() + ")" + this.filter.substring(idx2 + 1);
+            }
+        }
+    }
+
     private String getQuery() {
         params.add(new BasicNameValuePair("q", filter));
         return this.url.toString() + "?" + URLEncodedUtils.format(params, "UTF-8").replace("+", "%20");
@@ -114,7 +138,8 @@ public class SciHubSearch extends AbstractSearch {
                     double currentClouds;
                     for (String string : strings) {
                         if (string.contains("<entry>")) {
-                            currentProduct = new SentinelProductDescriptor();
+                            currentProduct = (this.productType == null || ProductType.S2MSI1C.equals(this.productType)) ?
+                                    new S2L1CProductDescriptor() : new S2L2AProductDescriptor();
                         } else if (string.contains("</entry>")) {
                             if (currentProduct != null) {
                                 double cloudsPercentage = currentProduct.getCloudsPercentage();

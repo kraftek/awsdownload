@@ -22,7 +22,11 @@ import ro.cs.products.util.Logger;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,7 +35,7 @@ import java.util.regex.Pattern;
  *
  * @author  Cosmin Cara
  */
-public class SentinelProductDescriptor extends ProductDescriptor {
+public class S2L1CProductDescriptor extends ProductDescriptor {
 
     private static final Pattern ProductV13 = Pattern.compile("(S2[A-B])_(OPER)_(PRD)_(MSIL1C)_(PDMC)_(\\d{8}T\\d{6})_(R\\d{3})_(V\\d{8}T\\d{6})_(\\d{8}T\\d{6})(?:.SAFE)?");
     private static final Pattern ProductV14 = Pattern.compile("(S2[A-B])_(MSIL1C)_(\\d{8}T\\d{6})_(N\\d{4})_(R\\d{3})_(T\\d{2}\\w{3})_(\\d{8}T\\d{6})(?:.SAFE)?");
@@ -39,11 +43,10 @@ public class SentinelProductDescriptor extends ProductDescriptor {
 
     private boolean oldFormat;
 
-
-    public SentinelProductDescriptor() {
+    public S2L1CProductDescriptor() {
     }
 
-    public SentinelProductDescriptor(String name) {
+    public S2L1CProductDescriptor(String name) {
         super(name);
         this.version = this.oldFormat ? Constants.PSD_13 : Constants.PSD_14;
     }

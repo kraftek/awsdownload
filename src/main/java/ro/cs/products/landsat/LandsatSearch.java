@@ -44,7 +44,7 @@ import java.util.List;
  *
  * @author Cosmin Cara
  */
-public class LandsatSearch extends AbstractSearch {
+public class LandsatSearch extends AbstractSearch<Object> {
 
     private List<NameValuePair> params;
     private List<NameValuePair> keyValues;

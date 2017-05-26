@@ -27,7 +27,7 @@ import java.util.Set;
  *
  * @author Cosmin Cara
  */
-public abstract class AbstractSearch {
+public abstract class AbstractSearch<T extends Object> {
     protected URI url;
     protected Polygon2D aoi;
     protected double cloudFilter;
@@ -35,6 +35,7 @@ public abstract class AbstractSearch {
     protected String sensingEnd;
     protected int relativeOrbit;
     protected Set<String> tiles;
+    protected T productType;
 
     public AbstractSearch(String url) throws URISyntaxException {
         this.url = new URI(url);
@@ -49,9 +50,7 @@ public abstract class AbstractSearch {
         this.sensingEnd = sensingEnd;
     }
 
-    public void setAreaOfInterest(Polygon2D polygon) {
-        this.aoi = polygon;
-    }
+    public void setAreaOfInterest(Polygon2D polygon) { this.aoi = polygon; }
 
     public void setClouds(double clouds) {
         this.cloudFilter = clouds;
@@ -62,6 +61,10 @@ public abstract class AbstractSearch {
     public void setTiles(Set<String> tiles) { this.tiles = tiles; }
 
     public Set<String> getTiles() { return this.tiles; }
+
+    public void setProductType(T type) { this.productType = type; }
+
+    public T getProductType() { return this.productType; }
 
     public abstract List<ProductDescriptor> execute() throws Exception;
 }

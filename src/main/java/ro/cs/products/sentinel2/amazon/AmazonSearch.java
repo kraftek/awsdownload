@@ -17,7 +17,8 @@ package ro.cs.products.sentinel2.amazon;
 
 import ro.cs.products.base.AbstractSearch;
 import ro.cs.products.base.ProductDescriptor;
-import ro.cs.products.sentinel2.SentinelProductDescriptor;
+import ro.cs.products.sentinel2.ProductType;
+import ro.cs.products.sentinel2.S2L1CProductDescriptor;
 import ro.cs.products.sentinel2.SentinelTilesMap;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.NetUtils;
@@ -45,7 +46,7 @@ import java.util.stream.Collectors;
  *
  * @author Cosmin Cara
  */
-public class AmazonSearch extends AbstractSearch {
+public class AmazonSearch extends AbstractSearch<ProductType> {
 
     public AmazonSearch(String url) throws URISyntaxException {
         super(url);
@@ -54,7 +55,7 @@ public class AmazonSearch extends AbstractSearch {
     @Override
     public List<ProductDescriptor> execute() throws Exception {
         Map<String, ProductDescriptor> results = new LinkedHashMap<>();
-        Set<String> tiles = this.tiles != null ?
+        Set<String> tiles = this.tiles != null && this.tiles.size() > 0 ?
                 this.tiles :
                 this.aoi != null ?
                         SentinelTilesMap.getInstance().intersectingTiles(this.aoi.getBounds2D()) :
@@ -155,7 +156,7 @@ public class AmazonSearch extends AbstractSearch {
         try (InputStream inputStream = new URI(jsonUrl).toURL().openStream()) {
             reader = Json.createReader(inputStream);
             JsonObject obj = reader.readObject();
-            descriptor = new SentinelProductDescriptor();
+            descriptor = new S2L1CProductDescriptor();
             descriptor.setName(obj.getString("name"));
             descriptor.setId(obj.getString("id"));
         } finally {

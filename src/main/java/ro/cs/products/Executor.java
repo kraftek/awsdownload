@@ -32,7 +32,8 @@ import ro.cs.products.landsat.LandsatProductDownloader;
 import ro.cs.products.landsat.LandsatSearch;
 import ro.cs.products.landsat.LandsatTilesMap;
 import ro.cs.products.sentinel2.ProductStore;
-import ro.cs.products.sentinel2.SentinelProductDescriptor;
+import ro.cs.products.sentinel2.ProductType;
+import ro.cs.products.sentinel2.S2L1CProductDescriptor;
 import ro.cs.products.sentinel2.SentinelProductDownloader;
 import ro.cs.products.sentinel2.SentinelTilesMap;
 import ro.cs.products.sentinel2.amazon.AmazonSearch;
@@ -212,13 +213,21 @@ public class Executor {
                 .required(false)
                 .build());
         /* Sensor/product type */
-        options.addOption(Option.builder(Constants.SENSOR)
+        options.addOption(Option.builder(Constants.PARAM_SENSOR)
                 .longOpt("sensor")
                 .argName("enum")
                 .desc("S2|L8")
                 .hasArg(true)
                 .required(false)
                 .build());
+        /* Sentinel-2 product type */
+        options.addOption(Option.builder(Constants.PARAM_S2_PRODUCT_TYPE)
+                          .longOpt("s2pt")
+                          .argName("sentinel2.product.type")
+                          .desc("S2MSI1C|S2MSI2Ap")
+                          .hasArg(true)
+                          .required(false)
+                          .build());
         /* Cloud coverage percentage */
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
                 .longOpt("cloudpercentage")
@@ -396,9 +405,12 @@ public class Executor {
         boolean debugMode = commandLine.hasOption(Constants.PARAM_VERBOSE);
         boolean searchMode = commandLine.hasOption(Constants.PARAM_SEARCH_ONLY);
         Logger.CustomLogger logger;
-        SensorType sensorType = commandLine.hasOption(Constants.SENSOR) ?
-                Enum.valueOf(SensorType.class, commandLine.getOptionValue(Constants.SENSOR)) :
+        SensorType sensorType = commandLine.hasOption(Constants.PARAM_SENSOR) ?
+                Enum.valueOf(SensorType.class, commandLine.getOptionValue(Constants.PARAM_SENSOR)) :
                 SensorType.S2;
+        ProductType productType = commandLine.hasOption(Constants.PARAM_S2_PRODUCT_TYPE) ?
+                Enum.valueOf(ProductType.class, commandLine.getOptionValue(Constants.PARAM_S2_PRODUCT_TYPE)) :
+                ProductType.S2MSI1C;
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
             folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));
@@ -494,19 +506,18 @@ public class Executor {
                 }
             } else if (commandLine.hasOption(Constants.PARAM_AREA_FILE)) {
                 areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue(Constants.PARAM_AREA_FILE))), StandardCharsets.UTF_8));
-            } else if (commandLine.hasOption(Constants.PARAM_TILE_SHAPE_FILE)) {
+            }
+            if (commandLine.hasOption(Constants.PARAM_TILE_SHAPE_FILE)) {
                 String tileShapeFile = commandLine.getOptionValue(Constants.PARAM_TILE_SHAPE_FILE);
                 if (Files.exists(Paths.get(tileShapeFile))) {
                     logger.info(String.format("Reading %s tiles extents", sensorType));
                     tileMap.fromKmlFile(tileShapeFile);
                     logger.info(String.valueOf(tileMap.getCount() + " tiles found"));
                 }
-            } else {
-                if (tileMap.getCount() == 0) {
-                    logger.info(String.format("Loading %s tiles extents", sensorType));
-                    tileMap.read(Executor.class.getResourceAsStream(sensorType + "tilemap.dat"));
-                    logger.info(String.valueOf(tileMap.getCount() + " tile extents loaded"));
-                }
+            } else if (tileMap.getCount() == 0) {
+                logger.info(String.format("Loading %s tiles extents", sensorType));
+                tileMap.read(Executor.class.getResourceAsStream(sensorType + "tilemap.dat"));
+                logger.info(String.valueOf(tileMap.getCount() + " tile extents loaded"));
             }
 
             if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
@@ -525,7 +536,7 @@ public class Executor {
                 }
                 for (int i = 0; i < productNames.length; i++) {
                     ProductDescriptor productDescriptor = sensorType == SensorType.S2 ?
-                            new SentinelProductDescriptor(productNames[i]) :
+                            new S2L1CProductDescriptor(productNames[i]) :
                             new LandsatProductDescriptor(productNames[i]);
                     if (uuids != null) {
                         productDescriptor.setId(uuids[i]);
@@ -535,7 +546,7 @@ public class Executor {
             } else if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST_FILE)) {
                 for (String line : Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_PRODUCT_LIST_FILE)))) {
                     products.add(sensorType == SensorType.S2 ?
-                            new SentinelProductDescriptor(line) :
+                            new S2L1CProductDescriptor(line) :
                             new LandsatProductDescriptor(line));
                 }
             }
@@ -636,7 +647,7 @@ public class Executor {
                         logger.warn(searchUrl + " is not available!");
                         searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
                     }
-                    searchProvider = new SciHubSearch(searchUrl);
+                    searchProvider = new SciHubSearch(searchUrl, productType);
                     SciHubSearch search = (SciHubSearch) searchProvider;
                     if (user != null && !user.isEmpty() && pwd != null && !pwd.isEmpty()) {
                         search = search.auth(user, pwd);
