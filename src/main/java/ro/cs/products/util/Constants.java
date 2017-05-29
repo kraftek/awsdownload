@@ -36,6 +36,7 @@ public class Constants {
     public static final String PARAM_START_DATE = "start";
     public static final String PARAM_END_DATE = "end";
     public static final String PARAM_RESULTS_LIMIT = "l";
+    public static final String PARAM_FLAG_RESUME = "r";
     public static final String PARAM_FLAG_COMPRESS = "z";
     public static final String PARAM_FLAG_DELETE = "d";
     public static final String PARAM_DOWNLOAD_STORE = "s";

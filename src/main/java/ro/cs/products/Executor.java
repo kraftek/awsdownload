@@ -24,6 +24,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionGroup;
 import org.apache.commons.cli.Options;
 import ro.cs.products.base.AbstractSearch;
+import ro.cs.products.base.DownloadMode;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.base.SensorType;
 import ro.cs.products.base.TileMap;
@@ -287,6 +288,14 @@ public class Executor {
         /*
          * Flag parameters
          */
+        /* Resume incomplete downloads */
+        options.addOption(Option.builder(Constants.PARAM_FLAG_RESUME)
+                                  .longOpt("resume")
+                                  .argName("resume")
+                                  .desc("Resume incomplete downloads")
+                                  .hasArg(false)
+                                  .optionalArg(true)
+                                  .build());
         /* Compression of downloads */
         options.addOption(Option.builder(Constants.PARAM_FLAG_COMPRESS)
                 .longOpt("zip")
@@ -411,6 +420,8 @@ public class Executor {
         ProductType productType = commandLine.hasOption(Constants.PARAM_S2_PRODUCT_TYPE) ?
                 Enum.valueOf(ProductType.class, commandLine.getOptionValue(Constants.PARAM_S2_PRODUCT_TYPE)) :
                 ProductType.S2MSI1C;
+        DownloadMode downloadMode = commandLine.hasOption(Constants.PARAM_FLAG_RESUME) ?
+                DownloadMode.RESUME : DownloadMode.OVERWRITE;
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
             folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));
@@ -492,7 +503,7 @@ public class Executor {
             ProductDownloader downloader = sensorType.equals(SensorType.S2) ?
                     new SentinelProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER), props) :
                     new LandsatProductDownloader(commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER), props);
-
+            downloader.setDownloadMode(downloadMode);
             TileMap tileMap = sensorType == SensorType.S2 ?
                     SentinelTilesMap.getInstance() :
                     LandsatTilesMap.getInstance();
@@ -510,14 +521,14 @@ public class Executor {
             if (commandLine.hasOption(Constants.PARAM_TILE_SHAPE_FILE)) {
                 String tileShapeFile = commandLine.getOptionValue(Constants.PARAM_TILE_SHAPE_FILE);
                 if (Files.exists(Paths.get(tileShapeFile))) {
-                    logger.info(String.format("Reading %s tiles extents", sensorType));
+                    logger.debug(String.format("Reading %s tiles extents", sensorType));
                     tileMap.fromKmlFile(tileShapeFile);
-                    logger.info(String.valueOf(tileMap.getCount() + " tiles found"));
+                    logger.debug(String.valueOf(tileMap.getCount() + " tiles found"));
                 }
             } else if (tileMap.getCount() == 0) {
-                logger.info(String.format("Loading %s tiles extents", sensorType));
+                logger.debug(String.format("Loading %s tiles extents", sensorType));
                 tileMap.read(Executor.class.getResourceAsStream(sensorType + "tilemap.dat"));
-                logger.info(String.valueOf(tileMap.getCount() + " tile extents loaded"));
+                logger.debug(String.valueOf(tileMap.getCount() + " tile extents loaded"));
             }
 
             if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {

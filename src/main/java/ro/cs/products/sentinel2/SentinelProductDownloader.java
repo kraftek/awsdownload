@@ -16,7 +16,6 @@
 package ro.cs.products.sentinel2;
 
 import ro.cs.products.ProductDownloader;
-import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.sentinel2.workaround.FillAnglesMethod;
 import ro.cs.products.sentinel2.workaround.MetadataRepairer;
 import ro.cs.products.util.Constants;
@@ -54,7 +53,7 @@ import java.util.regex.Pattern;
  *
  * @author Cosmin Cara
  */
-public class SentinelProductDownloader extends ProductDownloader {
+public class SentinelProductDownloader extends ProductDownloader<SentinelProductDescriptor> {
     private static final String prefix = "S2A_OPER_PRD_MSIL1C_PDMC_";
     private static final Set<String> l1cBandFiles = new LinkedHashSet<String>() {{
         add("B01.jp2");
@@ -206,33 +205,25 @@ public class SentinelProductDownloader extends ProductDownloader {
     }
 
     @Override
-    protected Path download(ProductDescriptor product) throws IOException {
+    protected Path download(SentinelProductDescriptor product) throws IOException {
         switch (store) {
             case AWS:
                 return downloadFromAWS(product);
             case SCIHUB:
             default:
-                if (product instanceof S2L1CProductDescriptor) {
-                    return downloadFromSciHub(product);
-                }
-                if (product instanceof S2L2AProductDescriptor) {
-                    return downloadFromSciHubL2(product);
-                }
                 return downloadFromSciHub(product);
         }
     }
 
     @Override
-    protected String getMetadataUrl(ProductDescriptor descriptor) {
+    protected String getMetadataUrl(SentinelProductDescriptor descriptor) {
         String url = null;
         switch (store) {
             case AWS:
                 url = getProductUrl(descriptor) + "metadata.xml";
                 break;
             case SCIHUB:
-                String metadateFileName = descriptor instanceof S2L1CProductDescriptor ?
-                        ((S2L1CProductDescriptor) descriptor).getMetadataFileName() :
-                        ((S2L2AProductDescriptor) descriptor).getMetadataFileName();
+                String metadateFileName = descriptor.getMetadataFileName();
                 url = odataMetadataPath.replace(Constants.ODATA_UUID, descriptor.getId())
                                   .replace(Constants.ODATA_PRODUCT_NAME, descriptor.getName())
                                   .replace(Constants.ODATA_XML_PLACEHOLDER, metadateFileName);
@@ -241,27 +232,27 @@ public class SentinelProductDownloader extends ProductDownloader {
         return url;
     }
 
-    private Path downloadFromSciHub(ProductDescriptor productDescriptor) throws IOException {
+    private Path downloadFromSciHub(SentinelProductDescriptor productDescriptor) throws IOException {
         Path rootPath = null;
         String url;
-        S2L1CProductDescriptor product = (S2L1CProductDescriptor) productDescriptor;
         Utilities.ensureExists(Paths.get(destination));
-        String productName = product.getName();
-        if (Constants.PSD_13.equals(product.getVersion()) && !shouldFilterTiles) {
+        String productName = productDescriptor.getName();
+        boolean isL1C = productDescriptor instanceof S2L1CProductDescriptor;
+        if (Constants.PSD_13.equals(productDescriptor.getVersion()) && !shouldFilterTiles) {
             currentStep = "Archive";
-            url = odataArchivePath.replace(Constants.ODATA_UUID, product.getId());
+            url = odataArchivePath.replace(Constants.ODATA_UUID, productDescriptor.getId());
             rootPath = Paths.get(destination, productName + ".zip");
             rootPath = downloadFile(url, rootPath, NetUtils.getAuthToken());
         }
         if (rootPath == null || !Files.exists(rootPath)) {
             rootPath = Utilities.ensureExists(Paths.get(destination, productName + ".SAFE"));
-            url = getMetadataUrl(product);
-            Path metadataFile = rootPath.resolve(product.getMetadataFileName());
+            url = getMetadataUrl(productDescriptor);
+            Path metadataFile = rootPath.resolve(productDescriptor.getMetadataFileName());
             currentStep = "Metadata";
-            downloadFile(url, metadataFile, true, NetUtils.getAuthToken());
+            downloadFile(url, metadataFile, NetUtils.getAuthToken());
             if (Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
-                List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + (Constants.PSD_13.equals(product.getVersion()) ? "s" : " "));
+                List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + (Constants.PSD_13.equals(productDescriptor.getVersion()) ? "s" : " "));
                 boolean hasTiles = updateMedatata(metadataFile, allLines);
                 if (hasTiles) {
                     Path tilesFolder = Utilities.ensureExists(rootPath.resolve(Constants.FOLDER_GRANULE));
@@ -271,15 +262,21 @@ public class SentinelProductDownloader extends ProductDownloader {
                     String dataStripId = null;
                     String skippedTiles = "";
                     for (String tileName : metaTileNames) {
-                        String tileId = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
-                        tileId = tileId.substring(tileId.lastIndexOf(NAME_SEPARATOR) + 2);
+                        String tileId;
+                        if (isL1C) {
+                            tileId = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
+                            tileId = tileId.substring(tileId.lastIndexOf(NAME_SEPARATOR) + 2);
+                        } else {
+                            int idx = tileName.lastIndexOf(NAME_SEPARATOR + "T");
+                            tileId = tileName.substring(idx + 2, idx + 7);
+                        }
                         if (filteredTiles.size() == 0 || filteredTiles.contains(tileId)) {
                             String granuleId = Utilities.getAttributeValue(tileName, Constants.XML_ATTR_GRANULE_ID);
                             if (dataStripId == null) {
                                 dataStripId = Utilities.getAttributeValue(tileName, Constants.XML_ATTR_DATASTRIP_ID);
                             }
-                            String granule = product.getGranuleFolder(dataStripId, granuleId);
-                            tileNames.put(granuleId, odataTilePath.replace(Constants.ODATA_UUID, product.getId())
+                            String granule = productDescriptor.getGranuleFolder(dataStripId, granuleId);
+                            tileNames.put(granuleId, odataTilePath.replace(Constants.ODATA_UUID, productDescriptor.getId())
                                     .replace(Constants.ODATA_PRODUCT_NAME, productName)
                                     .replace("${tile}", granule));
                         } else {
@@ -287,7 +284,7 @@ public class SentinelProductDownloader extends ProductDownloader {
                         }
                     }
                     if (skippedTiles.trim().length() > 0) {
-                        getLogger().info("Skipped tiles: %s", skippedTiles);
+                        getLogger().debug("Skipped tiles: %s", skippedTiles);
                     }
                     String count = String.valueOf(tileNames.size());
                     int tileCounter = 1;
@@ -297,160 +294,44 @@ public class SentinelProductDownloader extends ProductDownloader {
                         currentStep = "Tile " + String.valueOf(tileCounter++) + "/" + count;
                         String tileUrl = entry.getValue();
                         String granuleId = entry.getKey();
-                        String tileName = product.getGranuleFolder(dataStripId, granuleId);
+                        String tileName = productDescriptor.getGranuleFolder(dataStripId, granuleId);
                         Path tileFolder = Utilities.ensureExists(tilesFolder.resolve(tileName));
                         Path auxData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_AUXDATA));
                         Path imgData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_IMG_DATA));
                         Path qiData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_QI_DATA));
-                        String metadataName = product.getGranuleMetadataFileName(granuleId);
+                        String metadataName = productDescriptor.getGranuleMetadataFileName(granuleId);
                         Path tileMetaFile = downloadFile(pathBuilder.root(tileUrl).node(metadataName).value(), tileFolder.resolve(metadataName), NetUtils.getAuthToken());
                         if (tileMetaFile != null) {
                             if (Files.exists(tileMetaFile)) {
                                 List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
-                                for (String bandFileName : l1cBandFiles) {
-                                    if (this.bands == null || this.bands.contains(bandFileName.substring(0, bandFileName.indexOf(".")))) {
-                                        downloadFile(pathBuilder.root(tileUrl)
-                                                             .node(Constants.FOLDER_IMG_DATA)
-                                                             .node(product.getBandFileName(granuleId, bandFileName))
-                                                             .value(),
-                                                     imgData.resolve(product.getBandFileName(granuleId, bandFileName)),
-                                                     NetUtils.getAuthToken());
-                                    } else {
-                                        getLogger().info("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
-                                    }
-                                }
-                                List<String> lines = Utilities.filter(tileMetadataLines, "<MASK_FILENAME");
-                                for (String line : lines) {
-                                    line = line.trim();
-                                    int firstTagCloseIdx = line.indexOf(">") + 1;
-                                    int secondTagBeginIdx = line.indexOf("<", firstTagCloseIdx);
-                                    String maskFileName = line.substring(firstTagCloseIdx, secondTagBeginIdx);
-                                    maskFileName = maskFileName.substring(maskFileName.lastIndexOf(URL_SEPARATOR) + 1);
-                                    final String mfn = maskFileName;
-                                    if (this.bands == null || this.bands.stream().anyMatch(mfn::contains)) {
-                                        downloadFile(pathBuilder.root(tileUrl)
-                                                             .node(Constants.FOLDER_QI_DATA)
-                                                             .node(maskFileName)
-                                                             .value(),
-                                                     qiData.resolve(maskFileName),
-                                                     NetUtils.getAuthToken());
-                                    } else {
-                                        getLogger().info("Mask %s skipped", mfn);
-                                    }
-                                }
-                                getLogger().info("Tile download completed in %s", Utilities.formatTime(System.currentTimeMillis() - start));
-                            } else {
-                                getLogger().error("File %s was not downloaded", tileMetaFile.getFileName());
-                            }
-                        }
-                    }
-                    if (dataStripId != null) {
-                        String dataStripPath = pathBuilder.root(odataProductPath.replace(Constants.ODATA_UUID, product.getId())
-                                                                                .replace(Constants.ODATA_PRODUCT_NAME, productName))
-                                                          .node(Constants.FOLDER_DATASTRIP).node(product.getDatastripFolder(dataStripId))
-                                                          .node(product.getDatastripMetadataFileName(dataStripId))
-                                                          .value();
-                        Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(product.getDatastripFolder(dataStripId)));
-                        String dataStripFile = product.getDatastripMetadataFileName(dataStripId);
-                        downloadFile(dataStripPath, dataStrip.resolve(dataStripFile), NetUtils.getAuthToken());
-                    }
-                } else {
-                    Files.deleteIfExists(metadataFile);
-                    //Files.deleteIfExists(rootPath);
-                    rootPath = null;
-                    getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
-                }
-            } else {
-                getLogger().warn("The product %s was not found in %s data bucket", productName, store);
-                rootPath = null;
-            }
-        }
-        if (rootPath != null && Files.exists(rootPath) && shouldCompress && !rootPath.endsWith(".zip")) {
-            getLogger().info("Compressing product %s",product);
-            Zipper.compress(rootPath, rootPath.getFileName().toString(), shouldDeleteAfterCompression);
-        }
-        return rootPath;
-    }
-
-    private Path downloadFromSciHubL2(ProductDescriptor productDescriptor) throws IOException {
-        Path rootPath = null;
-        String url;
-        S2L2AProductDescriptor product = (S2L2AProductDescriptor) productDescriptor;
-        Utilities.ensureExists(Paths.get(destination));
-        String productName = product.getName();
-        if (Constants.PSD_13.equals(product.getVersion()) && !shouldFilterTiles) {
-            currentStep = "Archive";
-            url = odataArchivePath.replace(Constants.ODATA_UUID, product.getId());
-            rootPath = Paths.get(destination, productName + ".zip");
-            rootPath = downloadFile(url, rootPath, NetUtils.getAuthToken());
-        }
-        if (rootPath == null || !Files.exists(rootPath)) {
-            rootPath = Utilities.ensureExists(Paths.get(destination, productName + ".SAFE"));
-            url = getMetadataUrl(product);
-            Path metadataFile = rootPath.resolve(product.getMetadataFileName());
-            currentStep = "Metadata";
-            downloadFile(url, metadataFile, true, NetUtils.getAuthToken());
-            if (Files.exists(metadataFile)) {
-                List<String> allLines = Files.readAllLines(metadataFile);
-                List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + (Constants.PSD_13.equals(product.getVersion()) ? "s" : " "));
-                boolean hasTiles = updateMedatata(metadataFile, allLines);
-                if (hasTiles) {
-                    Path tilesFolder = Utilities.ensureExists(rootPath.resolve(Constants.FOLDER_GRANULE));
-                    Utilities.ensureExists(rootPath.resolve(Constants.FOLDER_AUXDATA));
-                    Path dataStripFolder = Utilities.ensureExists(rootPath.resolve(Constants.FOLDER_DATASTRIP));
-                    Map<String, String> tileNames = new HashMap<>();
-                    String dataStripId = null;
-                    String skippedTiles = "";
-                    for (String tileName : metaTileNames) {
-                        int idx = tileName.lastIndexOf(NAME_SEPARATOR + "T");
-                        String tileId = tileName.substring(idx + 2, idx + 7);
-                        if (filteredTiles.size() == 0 || filteredTiles.contains(tileId)) {
-                            String granuleId = Utilities.getAttributeValue(tileName, Constants.XML_ATTR_GRANULE_ID);
-                            if (dataStripId == null) {
-                                dataStripId = Utilities.getAttributeValue(tileName, Constants.XML_ATTR_DATASTRIP_ID);
-                            }
-                            String granule = product.getGranuleFolder(dataStripId, granuleId);
-                            tileNames.put(granuleId, odataTilePath.replace(Constants.ODATA_UUID, product.getId())
-                                    .replace(Constants.ODATA_PRODUCT_NAME, productName)
-                                    .replace("${tile}", granule));
-                        } else {
-                            skippedTiles += tileId + " ";
-                        }
-                    }
-                    if (skippedTiles.trim().length() > 0) {
-                        getLogger().info("Skipped tiles: %s", skippedTiles);
-                    }
-                    String count = String.valueOf(tileNames.size());
-                    int tileCounter = 1;
-                    ODataPath pathBuilder = new ODataPath();
-                    for (Map.Entry<String, String> entry : tileNames.entrySet()) {
-                        long start = System.currentTimeMillis();
-                        currentStep = "Tile " + String.valueOf(tileCounter++) + "/" + count;
-                        String tileUrl = entry.getValue();
-                        String granuleId = entry.getKey();
-                        String tileName = product.getGranuleFolder(dataStripId, granuleId);
-                        Path tileFolder = Utilities.ensureExists(tilesFolder.resolve(tileName));
-                        Path auxData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_AUXDATA));
-                        Path imgData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_IMG_DATA));
-                        Path qiData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_QI_DATA));
-                        String metadataName = product.getGranuleMetadataFileName(granuleId);
-                        Path tileMetaFile = downloadFile(pathBuilder.root(tileUrl).node(metadataName).value(), tileFolder.resolve(metadataName), NetUtils.getAuthToken());
-                        if (tileMetaFile != null) {
-                            if (Files.exists(tileMetaFile)) {
-                                List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
-                                for (Map.Entry<String, Set<String>> resEntry : l2aBandFiles.entrySet()) {
-                                    Path imgDataRes = Utilities.ensureExists(imgData.resolve(resEntry.getKey()));
-                                    for (String bandFileName : resEntry.getValue()) {
+                                if (isL1C) {
+                                    for (String bandFileName : l1cBandFiles) {
                                         if (this.bands == null || this.bands.contains(bandFileName.substring(0, bandFileName.indexOf(".")))) {
                                             downloadFile(pathBuilder.root(tileUrl)
                                                                  .node(Constants.FOLDER_IMG_DATA)
-                                                                 .node(resEntry.getKey())
-                                                                 .node(product.getBandFileName(granuleId, bandFileName))
+                                                                 .node(productDescriptor.getBandFileName(granuleId, bandFileName))
                                                                  .value(),
-                                                         imgDataRes.resolve(product.getBandFileName(granuleId, bandFileName)),
+                                                         imgData.resolve(productDescriptor.getBandFileName(granuleId, bandFileName)),
                                                          NetUtils.getAuthToken());
                                         } else {
-                                            getLogger().info("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
+                                            getLogger().debug("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
+                                        }
+                                    }
+                                } else {
+                                    for (Map.Entry<String, Set<String>> resEntry : l2aBandFiles.entrySet()) {
+                                        Path imgDataRes = Utilities.ensureExists(imgData.resolve(resEntry.getKey()));
+                                        for (String bandFileName : resEntry.getValue()) {
+                                            if (this.bands == null || this.bands.contains(bandFileName.substring(0, bandFileName.indexOf(".")))) {
+                                                downloadFile(pathBuilder.root(tileUrl)
+                                                                     .node(Constants.FOLDER_IMG_DATA)
+                                                                     .node(resEntry.getKey())
+                                                                     .node(productDescriptor.getBandFileName(granuleId, bandFileName))
+                                                                     .value(),
+                                                             imgDataRes.resolve(productDescriptor.getBandFileName(granuleId, bandFileName)),
+                                                             NetUtils.getAuthToken());
+                                            } else {
+                                                getLogger().debug("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
+                                            }
                                         }
                                     }
                                 }
@@ -470,16 +351,18 @@ public class SentinelProductDownloader extends ProductDownloader {
                                                      qiData.resolve(maskFileName),
                                                      NetUtils.getAuthToken());
                                     } else {
-                                        getLogger().info("Mask %s skipped", mfn);
+                                        getLogger().debug("Mask %s skipped", mfn);
                                     }
                                 }
-                                for (String maskFileName : l2aMasks) {
-                                    downloadFile(pathBuilder.root(tileUrl)
-                                                         .node(Constants.FOLDER_QI_DATA)
-                                                         .node(product.getBandFileName(granuleId, maskFileName))
-                                                         .value(),
-                                                 qiData.resolve(product.getBandFileName(granuleId, maskFileName)),
-                                                 NetUtils.getAuthToken());
+                                if (!isL1C) {
+                                    for (String maskFileName : l2aMasks) {
+                                        downloadFile(pathBuilder.root(tileUrl)
+                                                             .node(Constants.FOLDER_QI_DATA)
+                                                             .node(productDescriptor.getBandFileName(granuleId, maskFileName))
+                                                             .value(),
+                                                     qiData.resolve(productDescriptor.getBandFileName(granuleId, maskFileName)),
+                                                     NetUtils.getAuthToken());
+                                    }
                                 }
                                 getLogger().info("Tile download completed in %s", Utilities.formatTime(System.currentTimeMillis() - start));
                             } else {
@@ -488,13 +371,13 @@ public class SentinelProductDownloader extends ProductDownloader {
                         }
                     }
                     if (dataStripId != null) {
-                        String dataStripPath = pathBuilder.root(odataProductPath.replace(Constants.ODATA_UUID, product.getId())
-                                                                        .replace(Constants.ODATA_PRODUCT_NAME, productName))
-                                .node(Constants.FOLDER_DATASTRIP).node(product.getDatastripFolder(dataStripId))
-                                .node(product.getDatastripMetadataFileName(dataStripId))
-                                .value();
-                        Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(product.getDatastripFolder(dataStripId)));
-                        String dataStripFile = product.getDatastripMetadataFileName(dataStripId);
+                        String dataStripPath = pathBuilder.root(odataProductPath.replace(Constants.ODATA_UUID, productDescriptor.getId())
+                                                                                .replace(Constants.ODATA_PRODUCT_NAME, productName))
+                                                          .node(Constants.FOLDER_DATASTRIP).node(productDescriptor.getDatastripFolder(dataStripId))
+                                                          .node(productDescriptor.getDatastripMetadataFileName(dataStripId))
+                                                          .value();
+                        Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(productDescriptor.getDatastripFolder(dataStripId)));
+                        String dataStripFile = productDescriptor.getDatastripMetadataFileName(dataStripId);
                         downloadFile(dataStripPath, dataStrip.resolve(dataStripFile), NetUtils.getAuthToken());
                     }
                 } else {
@@ -509,13 +392,13 @@ public class SentinelProductDownloader extends ProductDownloader {
             }
         }
         if (rootPath != null && Files.exists(rootPath) && shouldCompress && !rootPath.endsWith(".zip")) {
-            getLogger().info("Compressing product %s",product);
+            getLogger().debug("Compressing product %s", productDescriptor);
             Zipper.compress(rootPath, rootPath.getFileName().toString(), shouldDeleteAfterCompression);
         }
         return rootPath;
     }
 
-    private Path downloadFromAWS(ProductDescriptor productDescriptor) throws IOException {
+    private Path downloadFromAWS(SentinelProductDescriptor productDescriptor) throws IOException {
         S2L1CProductDescriptor product = (S2L1CProductDescriptor) productDescriptor;
         Path rootPath = null;
         String url;
@@ -536,7 +419,7 @@ public class SentinelProductDownloader extends ProductDownloader {
             Path metadataFile = rootPath.resolve(product.getMetadataFileName()); //rootPath.resolve(productName.replace("PRD_MSIL1C", "MTD_SAFL1C") + ".xml");
             currentStep = "Metadata";
             getLogger().debug("Downloading metadata file %s", metadataFile);
-            metadataFile = downloadFile(url, metadataFile, true);
+            metadataFile = downloadFile(url, metadataFile);
             if (metadataFile != null && Files.exists(metadataFile)) {
                 Path inspireFile = metadataFile.resolveSibling("INSPIRE.xml");
                 Path manifestFile = metadataFile.resolveSibling("manifest.safe");
@@ -604,7 +487,7 @@ public class SentinelProductDownloader extends ProductDownloader {
                                         getLogger().warn("Download for %s failed [%s]", bandFileName, ex.getMessage());
                                     }
                                 } else {
-                                    getLogger().info("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
+                                    getLogger().debug("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
                                 }
                             }
                             List<String> lines = Utilities.filter(tileMetadataLines, "<MASK_FILENAME");
@@ -633,7 +516,7 @@ public class SentinelProductDownloader extends ProductDownloader {
                                         getLogger().warn("Download for %s failed [%s]", path, ex.getMessage());
                                     }
                                 } else {
-                                    getLogger().info("Mask %s skipped", maskFileName);
+                                    getLogger().debug("Mask %s skipped", maskFileName);
                                 }
                             }
                             getLogger().debug("Trying to download %s", tileUrl + "/auxiliary/ECMWFT");
@@ -682,14 +565,14 @@ public class SentinelProductDownloader extends ProductDownloader {
             }
         }
         if (rootPath != null && Files.exists(rootPath) && shouldCompress) {
-            getLogger().info("Compressing product %s", product);
+            getLogger().debug("Compressing product %s", product);
             Zipper.compress(rootPath, rootPath.getFileName().toString(), shouldDeleteAfterCompression);
         }
         return rootPath;
     }
 
     @Override
-    protected String getProductUrl(ProductDescriptor descriptor) {
+    protected String getProductUrl(SentinelProductDescriptor descriptor) {
         return productsUrl + descriptor.getProductRelativePath();
     }
 
@@ -715,7 +598,7 @@ public class SentinelProductDownloader extends ProductDownloader {
             }
         }
         if (skippedTiles.length() > 0) {
-            getLogger().info("Skipped tiles: %s", skippedTiles);
+            getLogger().debug("Skipped tiles: %s", skippedTiles);
         }
         return ret;
     }

@@ -16,7 +16,6 @@
 package ro.cs.products.sentinel2;
 
 import ro.cs.products.ProductDownloader;
-import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.util.Constants;
 import ro.cs.products.util.Logger;
 
@@ -26,8 +25,6 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -35,7 +32,7 @@ import java.util.regex.Pattern;
  *
  * @author  Cosmin Cara
  */
-public class S2L1CProductDescriptor extends ProductDescriptor {
+public class S2L1CProductDescriptor extends SentinelProductDescriptor {
 
     private static final Pattern ProductV13 = Pattern.compile("(S2[A-B])_(OPER)_(PRD)_(MSIL1C)_(PDMC)_(\\d{8}T\\d{6})_(R\\d{3})_(V\\d{8}T\\d{6})_(\\d{8}T\\d{6})(?:.SAFE)?");
     private static final Pattern ProductV14 = Pattern.compile("(S2[A-B])_(MSIL1C)_(\\d{8}T\\d{6})_(N\\d{4})_(R\\d{3})_(T\\d{2}\\w{3})_(\\d{8}T\\d{6})(?:.SAFE)?");
@@ -44,6 +41,7 @@ public class S2L1CProductDescriptor extends ProductDescriptor {
     private boolean oldFormat;
 
     public S2L1CProductDescriptor() {
+        super();
     }
 
     public S2L1CProductDescriptor(String name) {
@@ -78,6 +76,7 @@ public class S2L1CProductDescriptor extends ProductDescriptor {
         return year + ProductDownloader.URL_SEPARATOR + month + ProductDownloader.URL_SEPARATOR + day + ProductDownloader.URL_SEPARATOR + this.name + ProductDownloader.URL_SEPARATOR;
     }
 
+    @Override
     String getMetadataFileName() {
         String metaName;
         String[] tokens;
@@ -93,6 +92,7 @@ public class S2L1CProductDescriptor extends ProductDescriptor {
         return metaName;
     }
 
+    @Override
     String getDatastripMetadataFileName(String datastripIdentifier) {
         String name;
         if (this.oldFormat) {
@@ -103,6 +103,7 @@ public class S2L1CProductDescriptor extends ProductDescriptor {
         return name;
     }
 
+    @Override
     String getDatastripFolder(String datastripIdentifier) {
         String folder;
         if (this.oldFormat) {
@@ -113,6 +114,7 @@ public class S2L1CProductDescriptor extends ProductDescriptor {
         return folder;
     }
 
+    @Override
     String getGranuleFolder(String datastripIdentifier, String granuleIdentifier) {
         String folder;
         if (this.oldFormat) {
@@ -126,6 +128,7 @@ public class S2L1CProductDescriptor extends ProductDescriptor {
         return folder;
     }
 
+    @Override
     String getGranuleMetadataFileName(String granuleIdentifier) {
         String metaName;
         if (this.oldFormat) {
@@ -139,6 +142,7 @@ public class S2L1CProductDescriptor extends ProductDescriptor {
         return metaName;
     }
 
+    @Override
     String getBandFileName(String granuleIdentifier, String band) {
         String fileName;
         String[] tokens;
@@ -153,6 +157,7 @@ public class S2L1CProductDescriptor extends ProductDescriptor {
         return fileName;
     }
 
+    @Override
     String getEcmWftFileName(String granuleIdentifier) {
         String fileName;
         String prodName = this.name.endsWith(".SAFE") ? this.name.substring(0, this.name.length() - 5) : this.name;
@@ -184,24 +189,5 @@ public class S2L1CProductDescriptor extends ProductDescriptor {
     protected boolean verifyProductName(String name) {
         this.oldFormat = ProductV13.matcher(name).matches();
         return this.oldFormat || ProductV14.matcher(name).matches();
-    }
-
-    private String[] getTokens(Pattern pattern, String input, Map<Integer, String> replacements) {
-        String[] tokens = null;
-        Matcher matcher = pattern.matcher(input);
-        if (matcher.matches()) {
-            int count = matcher.groupCount();
-            tokens = new String[count];
-            for (int i = 0; i < tokens.length; i++) {
-                if (replacements != null && replacements.containsKey(i)) {
-                    tokens[i] = replacements.get(i);
-                } else {
-                    tokens[i] = matcher.group(i + 1);
-                }
-            }
-        } else {
-            throw new RuntimeException("Name doesn't match the specifications");
-        }
-        return tokens;
     }
 }

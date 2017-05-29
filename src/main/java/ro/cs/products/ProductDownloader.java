@@ -15,6 +15,7 @@
  */
 package ro.cs.products;
 
+import ro.cs.products.base.DownloadMode;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.NetUtils;
@@ -25,12 +26,15 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
@@ -41,28 +45,29 @@ import java.util.Set;
  *
  * @author  Cosmin Cara
  */
-public abstract class ProductDownloader {
-    public static final String startMessage = "(%s,%s) %s [size: %skB]";
-    public static final String completeMessage = "(%s,%s) %s [elapsed: %ss]";
-    public static final String errorMessage ="Cannot download %s: %s";
-    public static final int BUFFER_SIZE = 1024 * 1024;
-    public static final String NAME_SEPARATOR = "_";
+public abstract class ProductDownloader<T extends ProductDescriptor> {
+    private static final String startMessage = "(%s,%s) %s [size: %skB]";
+    private static final String completeMessage = "(%s,%s) %s [elapsed: %ss]";
+    private static final String errorMessage ="Cannot download %s: %s";
+    private static final int BUFFER_SIZE = 1024 * 1024;
+    protected static final String NAME_SEPARATOR = "_";
     public static final String URL_SEPARATOR = "/";
 
     protected Properties props;
     protected String destination;
     protected String baseUrl;
 
-    protected String currentProduct;
+    private String currentProduct;
     protected String currentStep;
 
     protected boolean shouldCompress;
     protected boolean shouldDeleteAfterCompression;
+    private DownloadMode downloadMode;
 
     protected Logger.ScopeLogger productLogger;
 
-    protected BatchProgressListener batchProgressListener;
-    protected ProgressListener fileProgressListener;
+    private BatchProgressListener batchProgressListener;
+    private ProgressListener fileProgressListener;
 
     protected Set<String> bands;
 
@@ -71,22 +76,26 @@ public abstract class ProductDownloader {
         this.props = properties;
     }
 
-    public void setProgressListener(BatchProgressListener listener) {
+    void setProgressListener(BatchProgressListener listener) {
         this.batchProgressListener = listener;
     }
 
-    public void setFileProgressListener(ProgressListener listener) { this.fileProgressListener = listener; }
+    void setFileProgressListener(ProgressListener listener) { this.fileProgressListener = listener; }
 
     public void setBandList(String[] bands) {
         this.bands = new HashSet<>();
         Collections.addAll(this.bands, bands);
     }
 
-    int downloadProducts(List<ProductDescriptor> products) {
+    void setDownloadMode(DownloadMode mode) {
+        this.downloadMode = mode;
+    }
+
+    int downloadProducts(List<T> products) {
         int retCode = ReturnCode.OK;
         if (products != null) {
             int productCounter = 1, productCount = products.size();
-            for (ProductDescriptor product : products) {
+            for (T product : products) {
                 long startTime = System.currentTimeMillis();
                 Path file = null;
                 currentProduct = "Product " + String.valueOf(productCounter++) + "/" + String.valueOf(productCount);
@@ -132,69 +141,77 @@ public abstract class ProductDownloader {
         this.shouldDeleteAfterCompression = shouldDeleteAfterCompression;
     }
 
-    protected abstract <T extends ProductDescriptor> String getProductUrl(T descriptor);
+    protected abstract String getProductUrl(T descriptor);
 
-    protected abstract String getMetadataUrl(ProductDescriptor descriptor);
+    protected abstract String getMetadataUrl(T descriptor);
 
-    protected abstract Path download(ProductDescriptor product) throws IOException;
+    protected abstract Path download(T product) throws IOException;
 
     protected Path downloadFile(String remoteUrl, Path file) throws IOException {
         return downloadFile(remoteUrl, file, null);
     }
 
     protected Path downloadFile(String remoteUrl, Path file, String authToken) throws IOException {
-        return downloadFile(remoteUrl, file, false, authToken);
+        return downloadFile(remoteUrl, file, this.downloadMode, authToken);
     }
 
-    protected Path downloadFile(String remoteUrl, Path file, boolean overwrite) throws IOException {
-        return downloadFile(remoteUrl, file, overwrite, null);
-    }
-
-    protected Path downloadFile(String remoteUrl, Path file, boolean overwrite, String authToken) throws IOException {
+    private Path downloadFile(String remoteUrl, Path file, DownloadMode mode, String authToken) throws IOException {
         HttpURLConnection connection = null;
-        Path tmpFile = null;
         try {
             Logger.getRootLogger().debug("Begin download for %s", remoteUrl);
             connection = NetUtils.openConnection(remoteUrl, authToken);
             long remoteFileLength = connection.getContentLengthLong();
             long localFileLength = 0;
-            if (!Files.exists(file) || remoteFileLength != (localFileLength = Files.size(file)) || overwrite) {
-                if (Files.exists(file) && remoteFileLength != localFileLength) {
-                    Logger.getRootLogger().debug("Remote file size: %s. Local file size: %s. File will be downloaded again.", remoteFileLength, localFileLength);
+            if (Files.exists(file)) {
+                localFileLength = Files.size(file);
+                if (localFileLength != remoteFileLength) {
+                    if (DownloadMode.RESUME.equals(mode)) {
+                        connection.disconnect();
+                        connection = NetUtils.openConnection(remoteUrl, authToken);
+                        connection.setRequestProperty("Range", "bytes=" + localFileLength + "-");
+                    } else {
+                        Files.delete(file);
+                    }
+                    Logger.getRootLogger().debug("Remote file size: %s. Local file size: %s. File " +
+                                                         (DownloadMode.OVERWRITE.equals(mode) ?
+                                                                 "will be downloaded again." :
+                                                                 "download will be resumed."),
+                                                 remoteFileLength,
+                                                 localFileLength);
                 }
+            }
+            if (localFileLength != remoteFileLength) {
                 int kBytes = (int) (remoteFileLength / 1024);
                 getLogger().info(startMessage, currentProduct, currentStep, file.getFileName(), kBytes);
                 InputStream inputStream = null;
-                OutputStream outputStream = null;
+                SeekableByteChannel outputStream = null;
                 try {
                     if (this.fileProgressListener != null) {
                         this.fileProgressListener.notifyProgress(0, 0);
                     }
-                    tmpFile = Files.createTempFile(file.getParent(), "tmp", null);
-                    Logger.getRootLogger().debug("Local temporary file %s created", tmpFile.toString());
+                    Logger.getRootLogger().debug("Local temporary file %s created", file.toString());
                     long start = System.currentTimeMillis();
                     inputStream = connection.getInputStream();
-                    outputStream = Files.newOutputStream(tmpFile);
+                    outputStream = Files.newByteChannel(file, EnumSet.of(StandardOpenOption.CREATE,
+                                                                         StandardOpenOption.APPEND,
+                                                                         StandardOpenOption.WRITE));
+                    outputStream.position(localFileLength);
                     byte[] buffer = new byte[BUFFER_SIZE];
                     int read;
                     int totalRead = 0;
                     long millis;
                     Logger.getRootLogger().debug("Begin reading from input stream");
                     while ((read = inputStream.read(buffer)) != -1) {
-                        outputStream.write(buffer, 0, read);
+                        outputStream.write(ByteBuffer.wrap(buffer, 0, read));
                         totalRead += read;
-                        //Thread.yield();
                         if (this.fileProgressListener != null) {
                             millis = (System.currentTimeMillis() - start) / 1000;
                             this.fileProgressListener.notifyProgress((double) totalRead / (double) remoteFileLength,
                                     (double) (totalRead / 1024 / 1024) / (double) millis);
                         }
                     }
-                    outputStream.flush();
                     Logger.getRootLogger().debug("End reading from input stream");
-                    Files.deleteIfExists(file);
-                    Files.move(tmpFile, file);
-                    getLogger().info(completeMessage, currentProduct, currentStep, file.getFileName(), (System.currentTimeMillis() - start) / 1000);
+                    getLogger().debug(completeMessage, currentProduct, currentStep, file.getFileName(), (System.currentTimeMillis() - start) / 1000);
                 } finally {
                     if (outputStream != null) outputStream.close();
                     if (inputStream != null) inputStream.close();
@@ -215,9 +232,6 @@ public abstract class ProductDownloader {
         } finally {
             if (connection != null) {
                 connection.disconnect();
-            }
-            if (tmpFile != null ) {
-                Files.deleteIfExists(tmpFile);
             }
         }
         return Utilities.ensurePermissions(file);

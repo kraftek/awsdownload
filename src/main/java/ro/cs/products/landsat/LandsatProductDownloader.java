@@ -16,7 +16,6 @@
 package ro.cs.products.landsat;
 
 import ro.cs.products.ProductDownloader;
-import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.Utilities;
 import ro.cs.products.util.Zipper;
@@ -34,7 +33,7 @@ import java.util.Set;
  *
  * @author Cosmin Cara
  */
-public class LandsatProductDownloader extends ProductDownloader {
+public class LandsatProductDownloader extends ProductDownloader<LandsatProductDescriptor> {
     private static final Set<String> bandFiles = new LinkedHashSet<String>() {{
         add("_B1.TIF");
         add("_B2.TIF");
@@ -59,12 +58,12 @@ public class LandsatProductDownloader extends ProductDownloader {
     }
 
     @Override
-    protected String getMetadataUrl(ProductDescriptor descriptor) {
+    protected String getMetadataUrl(LandsatProductDescriptor descriptor) {
         return getProductUrl(descriptor) + descriptor.getName() + "_MTL.txt";
     }
 
     @Override
-    protected Path download(ProductDescriptor product) throws IOException {
+    protected Path download(LandsatProductDescriptor product) throws IOException {
         String url;
         String productName = product.getName();
         Path rootPath = Utilities.ensureExists(Paths.get(destination, productName));
@@ -73,7 +72,7 @@ public class LandsatProductDownloader extends ProductDownloader {
         Path metadataFile = rootPath.resolve(productName + "_MTL.txt");
         currentStep = "Metadata";
         getLogger().debug("Downloading metadata file %s", metadataFile);
-        metadataFile = downloadFile(url, metadataFile, true);
+        metadataFile = downloadFile(url, metadataFile);
         if (metadataFile != null && Files.exists(metadataFile)) {
 
             for (String suffix : bandFiles) {
@@ -96,14 +95,14 @@ public class LandsatProductDownloader extends ProductDownloader {
             rootPath = null;
         }
         if (shouldCompress && rootPath != null) {
-            getLogger().info("Compressing product %s", product);
+            getLogger().debug("Compressing product %s", product);
             Zipper.compress(rootPath, rootPath.getFileName().toString(), shouldDeleteAfterCompression);
         }
         return rootPath;
     }
 
     @Override
-    protected String getProductUrl(ProductDescriptor descriptor) {
+    protected String getProductUrl(LandsatProductDescriptor descriptor) {
         return baseUrl + descriptor.getProductRelativePath();
     }
 }

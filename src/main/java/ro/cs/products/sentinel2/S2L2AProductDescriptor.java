@@ -1,20 +1,18 @@
 package ro.cs.products.sentinel2;
 
 import ro.cs.products.ProductDownloader;
-import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.util.Constants;
 
-import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * @author Cosmin Cara
  */
-public class S2L2AProductDescriptor extends ProductDescriptor {
+public class S2L2AProductDescriptor extends SentinelProductDescriptor {
     private static final Pattern ProductV14 = Pattern.compile("(S2[A-B])_(MSIL1C|MSIL2A)_(\\d{8}T\\d{6})_(N\\d{4})_(R\\d{3})_(T\\d{2}\\w{3})_(\\d{8}T\\d{6})(?:.SAFE)?");
 
     public S2L2AProductDescriptor() {
+        super();
     }
 
     public S2L2AProductDescriptor(String name) {
@@ -43,18 +41,22 @@ public class S2L2AProductDescriptor extends ProductDescriptor {
         return year + ProductDownloader.URL_SEPARATOR + month + ProductDownloader.URL_SEPARATOR + day + ProductDownloader.URL_SEPARATOR + this.name + ProductDownloader.URL_SEPARATOR;
     }
 
+    @Override
     String getMetadataFileName() {
         return "MTD_MSIL2A.xml";
     }
 
+    @Override
     String getDatastripMetadataFileName(String datastripIdentifier) {
         return "MTD_DS.xml";
     }
 
+    @Override
     String getDatastripFolder(String datastripIdentifier) {
         return datastripIdentifier.substring(17, 57);
     }
 
+    @Override
     String getGranuleFolder(String datastripIdentifier, String granuleIdentifier) {
         return granuleIdentifier.substring(13, 16) + "_" +
                granuleIdentifier.substring(49, 55) + "_" +
@@ -62,10 +64,12 @@ public class S2L2AProductDescriptor extends ProductDescriptor {
                datastripIdentifier.substring(42, 57);
     }
 
+    @Override
     String getGranuleMetadataFileName(String granuleIdentifier) {
         return "MTD_TL.xml";
     }
 
+    @Override
     String getBandFileName(String granuleIdentifier, String band) {
         String[] tokens;
         String prodName = this.name.endsWith(".SAFE") ? this.name.substring(0, this.name.length() - 5) : this.name;
@@ -73,6 +77,7 @@ public class S2L2AProductDescriptor extends ProductDescriptor {
         return "L2A_" + tokens[5] + "_" + tokens[2] + "_" + band;
     }
 
+    @Override
     String getEcmWftFileName(String granuleIdentifier) {
         return "AUX_ECMWFT";
     }
@@ -80,24 +85,5 @@ public class S2L2AProductDescriptor extends ProductDescriptor {
     @Override
     protected boolean verifyProductName(String name) {
         return ProductV14.matcher(name).matches();
-    }
-
-    private String[] getTokens(Pattern pattern, String input, Map<Integer, String> replacements) {
-        String[] tokens = null;
-        Matcher matcher = pattern.matcher(input);
-        if (matcher.matches()) {
-            int count = matcher.groupCount();
-            tokens = new String[count];
-            for (int i = 0; i < tokens.length; i++) {
-                if (replacements != null && replacements.containsKey(i)) {
-                    tokens[i] = replacements.get(i);
-                } else {
-                    tokens[i] = matcher.group(i + 1);
-                }
-            }
-        } else {
-            throw new RuntimeException("Name doesn't match the specifications");
-        }
-        return tokens;
     }
 }
