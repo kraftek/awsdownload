@@ -42,6 +42,11 @@ public class S2L2AProductDescriptor extends SentinelProductDescriptor {
     }
 
     @Override
+    String getTileIdentifier() {
+        return getTokens(ProductV14, this.name, null)[5];
+    }
+
+    @Override
     String getMetadataFileName() {
         return "MTD_MSIL2A.xml";
     }

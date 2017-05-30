@@ -18,10 +18,8 @@ package ro.cs.products.sentinel2;
 import ro.cs.products.base.TileMap;
 import ro.cs.products.util.Polygon2D;
 
-import java.awt.geom.Rectangle2D;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.Set;
 
 /**
  * Map of S2 tile extents. The initial map can be created from the official
@@ -73,18 +71,5 @@ public class SentinelTilesMap extends TileMap {
             if (bufferedReader != null)
                 bufferedReader.close();
         }
-    }
-
-    @Override
-    public Rectangle2D boundingBox(Set<String> tileCodes) {
-        final Rectangle2D boundingBox = super.boundingBox(tileCodes);
-        final double overlap = 0.1;
-        double odx = boundingBox.getWidth() * overlap;
-        double x = boundingBox.getMinX() + odx;
-        double y = boundingBox.getMinY() + odx;
-        double w = boundingBox.getWidth() - 2 * odx;
-        double h = boundingBox.getHeight() - 2 * odx;
-        boundingBox.setRect(x, y, w, h);
-        return boundingBox;
     }
 }

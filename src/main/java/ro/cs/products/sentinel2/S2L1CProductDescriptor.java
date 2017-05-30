@@ -77,6 +77,16 @@ public class S2L1CProductDescriptor extends SentinelProductDescriptor {
     }
 
     @Override
+    String getTileIdentifier() {
+        String tileId = null;
+        if (!this.oldFormat) {
+            tileId = getTokens(ProductV14, this.name, null)[5];
+            tileId = tileId.substring(1);
+        }
+        return tileId;
+    }
+
+    @Override
     String getMetadataFileName() {
         String metaName;
         String[] tokens;

@@ -17,6 +17,8 @@ public abstract class SentinelProductDescriptor extends ProductDescriptor {
         super(name);
     }
 
+    abstract String getTileIdentifier();
+
     abstract String getMetadataFileName();
 
     abstract String getDatastripMetadataFileName(String datastripIdentifier);

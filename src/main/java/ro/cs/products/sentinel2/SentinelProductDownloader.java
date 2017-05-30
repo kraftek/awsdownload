@@ -54,7 +54,6 @@ import java.util.regex.Pattern;
  * @author Cosmin Cara
  */
 public class SentinelProductDownloader extends ProductDownloader<SentinelProductDescriptor> {
-    private static final String prefix = "S2A_OPER_PRD_MSIL1C_PDMC_";
     private static final Set<String> l1cBandFiles = new LinkedHashSet<String>() {{
         add("B01.jp2");
         add("B02.jp2");
@@ -206,6 +205,10 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
 
     @Override
     protected Path download(SentinelProductDescriptor product) throws IOException {
+        String tileId = product.getTileIdentifier();
+        if (tileId != null && this.filteredTiles != null && !this.filteredTiles.contains(tileId)) {
+            return null;
+        }
         switch (store) {
             case AWS:
                 return downloadFromAWS(product);
