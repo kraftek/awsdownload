@@ -207,6 +207,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
     protected Path download(SentinelProductDescriptor product) throws IOException {
         String tileId = product.getTileIdentifier();
         if (tileId != null && this.filteredTiles != null && !this.filteredTiles.contains(tileId)) {
+            getLogger().warn("The product %s did not contain any tiles from the tile list", product.getName());
             return null;
         }
         switch (store) {
