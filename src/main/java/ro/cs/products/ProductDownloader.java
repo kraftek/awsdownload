@@ -189,7 +189,7 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
                     if (this.fileProgressListener != null) {
                         this.fileProgressListener.notifyProgress(0, 0);
                     }
-                    Logger.getRootLogger().debug("Local temporary file %s created", file.toString());
+                    //Logger.getRootLogger().debug("Local temporary file %s created", file.toString());
                     long start = System.currentTimeMillis();
                     inputStream = connection.getInputStream();
                     outputStream = Files.newByteChannel(file, EnumSet.of(StandardOpenOption.CREATE,

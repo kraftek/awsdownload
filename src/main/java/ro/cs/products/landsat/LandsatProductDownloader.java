@@ -16,6 +16,7 @@
 package ro.cs.products.landsat;
 
 import ro.cs.products.ProductDownloader;
+import ro.cs.products.util.Constants;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.Utilities;
 import ro.cs.products.util.Zipper;
@@ -52,7 +53,7 @@ public class LandsatProductDownloader extends ProductDownloader<LandsatProductDe
     public LandsatProductDownloader(String targetFolder, Properties properties) {
         super(targetFolder, properties);
 
-        baseUrl = props.getProperty("l8.aws.products.url", "http://landsat-pds.s3.amazonaws.com/L8/");
+        baseUrl = props.getProperty("l8.aws.products.url", "http://landsat-pds.s3.amazonaws.com/");
         if (!baseUrl.endsWith("/"))
             baseUrl += "/";
     }
@@ -74,7 +75,6 @@ public class LandsatProductDownloader extends ProductDownloader<LandsatProductDe
         getLogger().debug("Downloading metadata file %s", metadataFile);
         metadataFile = downloadFile(url, metadataFile);
         if (metadataFile != null && Files.exists(metadataFile)) {
-
             for (String suffix : bandFiles) {
                 String bandName = suffix.substring(1, suffix.indexOf("."));
                 if (this.bands == null || this.bands.contains(bandName)) {
@@ -88,6 +88,17 @@ public class LandsatProductDownloader extends ProductDownloader<LandsatProductDe
                     } catch (IOException ex) {
                         getLogger().warn("Download for %s failed [%s]", bandFileName, ex.getMessage());
                     }
+                }
+            }
+            if (Constants.L8_COLL.equals(product.getVersion())) {
+                String fileName = productName + "_ANG.txt";
+                try {
+                    String fileUrl = getProductUrl(product) + fileName;
+                    Path path = rootPath.resolve(fileName);
+                    getLogger().debug("Downloading band raster %s from %s", path, fileUrl);
+                    downloadFile(fileUrl, path);
+                } catch (IOException ex) {
+                    getLogger().warn("Download for %s failed [%s]", fileName, ex.getMessage());
                 }
             }
         } else {

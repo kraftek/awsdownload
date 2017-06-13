@@ -16,7 +16,11 @@
 package ro.cs.products.util;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.FileStore;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
@@ -115,9 +119,9 @@ public class Utilities {
             if (isPosixFileSystem()) {
                 Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
                 FileAttribute<Set<PosixFilePermission>> attrs = PosixFilePermissions.asFileAttribute(perms);
-                folder = Files.createDirectory(folder, attrs);
+                folder = Files.createDirectories(folder, attrs);
             } else {
-                folder = Files.createDirectory(folder);
+                folder = Files.createDirectories(folder);
             }
 
         }

@@ -78,6 +78,8 @@ public class Constants {
     public static final String PARAM_GUI = "gui";
     public static final String PSD_13 = "13";
     public static final String PSD_14 = "14";
+    public static final String L8_PRECOLL = "preColl";
+    public static final String L8_COLL = "coll";
     public static final String XML_ATTR_GRANULE_ID = "granuleIdentifier";
     public static final String XML_ATTR_DATASTRIP_ID = "datastripIdentifier";
     public static final String ODATA_UUID = "${UUID}";
