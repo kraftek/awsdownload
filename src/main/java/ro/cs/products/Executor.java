@@ -51,7 +51,9 @@ import ro.cs.products.util.ReturnCode;
 import ro.cs.products.util.Utilities;
 
 import java.awt.geom.Rectangle2D;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -64,6 +66,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
@@ -85,321 +88,37 @@ public class Executor {
 
     static {
         options = new Options();
-
-        /* Target folder */
-        Option outFolder = Option.builder(Constants.PARAM_OUT_FOLDER)
-                .longOpt("out")
-                .argName("output.folder")
-                .desc("The folder in which the products will be downloaded")
-                .hasArg()
-                .required()
-                .build();
-        /* Input folder for offline angles correction */
-        Option inFolder = Option.builder(Constants.PARAM_INPUT_FOLDER)
-                .longOpt("input")
-                .argName("input.folder")
-                .desc("The folder in which the products are to be inspected")
-                .hasArg()
-                .required()
-                .build();
-        OptionGroup folderGroup = new OptionGroup();
-        folderGroup.addOption(outFolder);
-        folderGroup.addOption(inFolder);
-        options.addOptionGroup(folderGroup);
-
-        /* Area of interest */
-        Option optionArea = Option.builder(Constants.PARAM_AREA)
-                .longOpt("area")
-                .argName("lon1,lat1 lon2,lat2 ...")
-                .desc("A closed polygon whose vertices are given in <lon,lat> pairs, space-separated")
-                .hasArgs()
-                .optionalArg(true)
-                .valueSeparator(' ')
-                .build();
-        /* File containing the area of interest */
-        Option optionAreaFile = Option.builder(Constants.PARAM_AREA_FILE)
-                .longOpt("areafile")
-                .argName("aoi.file")
-                .desc("The file containing a closed polygon whose vertices are given in <lon lat> pairs, comma-separated")
-                .hasArg()
-                .optionalArg(true)
-                .build();
-        /* file containing the Sentinel-2 tile extents */
-        Option optionTileShapeFile = Option.builder(Constants.PARAM_TILE_SHAPE_FILE)
-                .longOpt("shapetiles")
-                .argName("tile.shapes.file")
-                .desc("The kml file containing Sentinel-2 tile extents")
-                .hasArg()
-                .optionalArg(true)
-                .build();
-        OptionGroup areaGroup = new OptionGroup();
-        areaGroup.addOption(optionArea);
-        areaGroup.addOption(optionAreaFile);
-        areaGroup.addOption(optionTileShapeFile);
-        options.addOptionGroup(areaGroup);
-
-        /* List of S2 tiles */
-        Option optionTileList = Option.builder(Constants.PARAM_TILE_LIST)
-                .longOpt("tiles")
-                .argName("tileId1 tileId2 ...")
-                .desc("A list of S2 tile IDs, space-separated")
-                .hasArgs()
-                .optionalArg(true)
-                .valueSeparator(' ')
-                .build();
-        /* File containing the list of S2 tiles */
-        Option optionTileFile = Option.builder(Constants.PARAM_TILE_LIST_FILE)
-                .longOpt("tilefile")
-                .argName("tile.file")
-                .desc("A file containing a list of S2 tile IDs, one tile id per line")
-                .hasArg()
-                .optionalArg(true)
-                .build();
-        OptionGroup tileGroup = new OptionGroup();
-        tileGroup.addOption(optionTileList);
-        tileGroup.addOption(optionTileFile);
-        options.addOptionGroup(tileGroup);
-
-        /* Product names */
-        Option optionProductList = Option.builder(Constants.PARAM_PRODUCT_LIST)
-                .longOpt("products")
-                .argName("product1 product2 ...")
-                .desc("A list of S2/L8 product names, space-separated")
-                .hasArgs()
-                .optionalArg(true)
-                .valueSeparator(' ')
-                .build();
-        /* File containing the product names */
-        Option optionProductFile = Option.builder(Constants.PARAM_PRODUCT_LIST_FILE)
-                .longOpt("productfile")
-                .argName("product.file")
-                .desc("A file containing a list of S2/L8 products, one product name per line")
-                .hasArg()
-                .optionalArg(true)
-                .build();
-        OptionGroup productGroup = new OptionGroup();
-        productGroup.addOption(optionProductList);
-        productGroup.addOption(optionProductFile);
-        options.addOptionGroup(productGroup);
-        /* S2 products UUIDs */
-        options.addOption(Option.builder(Constants.PARAM_PRODUCT_UUID_LIST)
-                .longOpt("uuid")
-                .argName("uuid1 uui2 ...")
-                .desc("A list of S2 product unique identifiers, as retrieved from SciHub, space-separated")
-                .hasArgs()
-                .optionalArg(true)
-                .valueSeparator(' ')
-                .build());
-        /* Band list */
-        options.addOption(Option.builder(Constants.PARAM_BAND_LIST)
-                .longOpt("bands")
-                .argName("band1 band2 ...")
-                .desc("The list of S2/L8 band names, space-separated, to be downloaded")
-                .hasArgs()
-                .optionalArg(true)
-                .valueSeparator(' ')
-                .build());
-        /* SciHub user */
-        options.addOption(Option.builder(Constants.PARAM_USER)
-                .longOpt("user")
-                .argName("user")
-                .desc("User account to connect to SCIHUB")
-                .hasArg(true)
-                .required(false)
-                .build());
-        /* SciHub password */
-        options.addOption(Option.builder(Constants.PARAM_PASSWORD)
-                .longOpt("password")
-                .argName("password")
-                .desc("Password to connect to SCIHUB")
-                .hasArg(true)
-                .required(false)
-                .build());
-        /* Sensor/product type */
-        options.addOption(Option.builder(Constants.PARAM_SENSOR)
-                .longOpt("sensor")
-                .argName("enum")
-                .desc("S2|L8")
-                .hasArg(true)
-                .required(false)
-                .build());
-        /* Landsat8 collection type */
-        options.addOption(Option.builder(Constants.PARAM_L8_COLLECTION)
-                                  .longOpt("l8col")
-                                  .argName("enum")
-                                  .desc("PRE|C1")
-                                  .hasArg(true)
-                                  .required(false)
-                                  .build());
-        /* Sentinel-2 product type */
-        options.addOption(Option.builder(Constants.PARAM_S2_PRODUCT_TYPE)
-                          .longOpt("s2pt")
-                          .argName("sentinel2.product.type")
-                          .desc("S2MSI1C|S2MSI2Ap")
-                          .hasArg(true)
-                          .required(false)
-                          .build());
-        /* Landsat 8 product type */
-        options.addOption(Option.builder(Constants.PARAM_L8_PRODUCT_TYPE)
-                                  .longOpt("l8pt")
-                                  .argName("landsat8.product.type")
-                                  .desc("RT|T1|T2")
-                                  .hasArg(true)
-                                  .required(false)
-                                  .build());
-        /* Cloud coverage percentage */
-        options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
-                .longOpt("cloudpercentage")
-                .argName("number between 0 and 100")
-                .desc("The threshold for cloud coverage of the products. Above this threshold, the products will be ignored. Default is 100.")
-                .hasArg()
-                .optionalArg(true)
-                .build());
-        /* Start date */
-        options.addOption(Option.builder(Constants.PARAM_START_DATE)
-                .longOpt("startdate")
-                .argName("yyyy-MM-dd")
-                .desc("Look for products from a specific date (formatted as yyyy-MM-dd). Default is current date -7 days")
-                .hasArg()
-                .optionalArg(true)
-                .build());
-        /* End date */
-        options.addOption(Option.builder(Constants.PARAM_END_DATE)
-                .longOpt("enddate")
-                .argName("yyyy-MM-dd")
-                .desc("Look for products up to (and including) a specific date (formatted as yyyy-MM-dd). Default is current date")
-                .hasArg()
-                .optionalArg(true)
-                .build());
-        /* Max number of returned query results */
-        options.addOption(Option.builder(Constants.PARAM_RESULTS_LIMIT)
-                .longOpt("limit")
-                .argName("integer greater than 1")
-                .desc("The maximum number of products returned. Default is 10.")
-                .hasArg()
-                .optionalArg(true)
-                .build());
-        /* Download store */
-        options.addOption(Option.builder(Constants.PARAM_DOWNLOAD_STORE)
-                .longOpt("store")
-                .argName("AWS|SCIHUB")
-                .desc("Store of products being downloaded. Supported values are AWS or SCIHUB")
-                .hasArg(true)
-                .optionalArg(true)
-                .build());
-        /* Relative orbit number */
-        options.addOption(Option.builder(Constants.PARAM_RELATIVE_ORBIT)
-                .longOpt("relative.orbit")
-                .argName("integer")
-                .desc("Relative orbit number")
-                .hasArg(true)
-                .optionalArg(true)
-                .build());
-        /* Missing angles compensation method */
-        options.addOption(Option.builder(Constants.PARAM_FILL_ANGLES)
-                .longOpt("ma")
-                .argName("NONE|NAN|INTERPOLATE")
-                .desc("Interpolate missing angles grids (if some are absent)")
-                .hasArg(true)
-                .optionalArg(true)
-                .build());
-        /*
-         * Flag parameters
-         */
-        /* Resume incomplete downloads */
-        options.addOption(Option.builder(Constants.PARAM_FLAG_RESUME)
-                                  .longOpt("resume")
-                                  .argName("resume")
-                                  .desc("Resume incomplete downloads")
-                                  .hasArg(false)
-                                  .optionalArg(true)
-                                  .build());
-        /* Compression of downloads */
-        options.addOption(Option.builder(Constants.PARAM_FLAG_COMPRESS)
-                .longOpt("zip")
-                .argName("zip")
-                .desc("Compresses the product into a zip archive")
-                .hasArg(false)
-                .optionalArg(true)
-                .build());
-        /* Deletion of files after compression */
-        options.addOption(Option.builder(Constants.PARAM_FLAG_DELETE)
-                .longOpt("delete")
-                .argName("delete")
-                .desc("Delete the product files after compression")
-                .hasArg(false)
-                .optionalArg(true)
-                .build());
-        /* Uncompressed files download from SciHub */
-        options.addOption(Option.builder(Constants.PARAM_FLAG_UNPACKED)
-                .longOpt("unpacked")
-                .argName("unpacked")
-                .desc("Download unpacked products (SciHub only)")
-                .hasArg(false)
-                .optionalArg(true)
-                .build());
-        /* Searching AWS instead of SciHub */
-        options.addOption(Option.builder(Constants.PARAM_FLAG_SEARCH_AWS)
-                .longOpt("aws")
-                .argName("aws")
-                .desc("Perform search directly into AWS (slower but doesn't go through SciHub)")
-                .hasArg(false)
-                .optionalArg(true)
-                .build());
-        /* Verbose logging/output */
-        options.addOption(Option.builder(Constants.PARAM_VERBOSE)
-                .longOpt("verbose")
-                .argName("verbose")
-                .desc("Produces verbose output/logs")
-                .hasArg(false)
-                .optionalArg(true)
-                .build());
-        /* Mode (full/search) */
-        options.addOption(Option.builder(Constants.PARAM_SEARCH_ONLY)
-                  .longOpt("query")
-                  .argName("query")
-                  .desc("Only perform query and return product names")
-                  .hasArg(false)
-                  .optionalArg(true)
-                  .build());
-        /*
-         * Proxy parameters
-         */
-        options.addOption(Option.builder(Constants.PARAM_PROXY_TYPE)
-                .longOpt("proxy.type")
-                .argName("http|socks")
-                .desc("Proxy type (http or socks)")
-                .hasArg(true)
-                .optionalArg(true)
-                .build());
-        options.addOption(Option.builder(Constants.PARAM_PROXY_HOST)
-                .longOpt("proxy.host")
-                .argName("proxy.host")
-                .desc("Proxy host")
-                .hasArg(true)
-                .optionalArg(true)
-                .build());
-        options.addOption(Option.builder(Constants.PARAM_PROXY_PORT)
-                .longOpt("proxy.port")
-                .argName("integer greater than 0")
-                .desc("Proxy port")
-                .hasArg(true)
-                .optionalArg(true)
-                .build());
-        options.addOption(Option.builder(Constants.PARAM_PROXY_USER)
-                .longOpt("proxy.user")
-                .argName("proxy.user")
-                .desc("Proxy user")
-                .hasArg(true)
-                .optionalArg(true)
-                .build());
-        options.addOption(Option.builder(Constants.PARAM_PROXY_PASSWORD)
-                .longOpt("proxy.password")
-                .argName("proxy.password")
-                .desc("Proxy password")
-                .hasArg(true)
-                .optionalArg(true)
-                .build());
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(Executor.class.getResourceAsStream("parameters.def")))) {
+            HashMap<String, List<String[]>> groups = new HashMap<>();
+            reader.lines()
+                    .filter(l -> {
+                          String trimmed = l.trim();
+                          return !trimmed.startsWith("#") &&
+                                  !(trimmed.startsWith("\r") || trimmed.startsWith("\n"));
+                    })
+                    .forEach(s -> {
+                        String[] tokens = s.split(";");
+                        if (tokens.length == 8) {
+                            String key = tokens[0].trim();
+                            if (!groups.containsKey(key)) {
+                                groups.put(key, new ArrayList<>());
+                            }
+                            groups.get(key).add(tokens);
+                        }
+                    });
+            for (String key : groups.keySet()) {
+                if ("n/a".equals(key)) {
+                    groups.get(key).forEach(values -> options.addOption(buildOption(values)));
+                } else {
+                    OptionGroup group = new OptionGroup();
+                    groups.get(key).forEach(values -> group.addOption(buildOption(values)));
+                    options.addOptionGroup(group);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(Integer.MAX_VALUE);
+        }
         props = new Properties();
         try {
             props.load(Executor.class.getResourceAsStream("download.properties"));
@@ -423,6 +142,26 @@ public class Executor {
         CommandLineParser parser = new DefaultParser();
         CommandLine commandLine = parser.parse(options, args);
         return execute(commandLine);
+    }
+
+    private static Option buildOption(String[] values) {
+        Option.Builder optionBuilder = Option.builder(values[1].trim())
+                .longOpt(values[2].trim())
+                .argName(values[4].trim())
+                .desc(values[7].trim())
+                .optionalArg(Boolean.parseBoolean(values[6].trim()));
+        String cardinality = values[3].trim();
+        switch (cardinality) {
+            case "1":
+                optionBuilder.hasArg();
+                break;
+            case "n":
+                optionBuilder.hasArgs().valueSeparator(values[5].trim().charAt(1));
+                break;
+            default:
+                break;
+        }
+        return optionBuilder.build();
     }
 
     private static int execute(CommandLine commandLine) throws Exception {

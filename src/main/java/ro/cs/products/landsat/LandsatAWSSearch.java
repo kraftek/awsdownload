@@ -1,10 +1,12 @@
 package ro.cs.products.landsat;
 
+import ro.cs.products.ProductDownloader;
 import ro.cs.products.base.AbstractSearch;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.sentinel2.SentinelTilesMap;
 import ro.cs.products.sentinel2.amazon.Result;
 import ro.cs.products.sentinel2.amazon.ResultParser;
+import ro.cs.products.util.Constants;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.NetUtils;
 
@@ -58,10 +60,11 @@ public class LandsatAWSSearch extends AbstractSearch<CollectionCategory> {
         startDate.setTime(dateFormat.parse(this.sensingStart));
         Calendar endDate = Calendar.getInstance();
         endDate.setTime(dateFormat.parse(this.sensingEnd));
+        final String baseUrl = this.url.toString();
         for (String tile : tiles) {
             String path = tile.substring(0, 3);
             String row = tile.substring(3, 6);
-            String tileUrl = this.url.toString() + path + "/" + row + "/";
+            String tileUrl = baseUrl + path + ProductDownloader.URL_SEPARATOR + row + ProductDownloader.URL_SEPARATOR;
             Result productResult = ResultParser.parse(NetUtils.getResponseAsString(tileUrl));
             if (productResult.getCommonPrefixes() != null) {
                 Set<String> names = productResult.getCommonPrefixes().stream()
@@ -72,8 +75,8 @@ public class LandsatAWSSearch extends AbstractSearch<CollectionCategory> {
                         LandsatProductDescriptor temporaryDescriptor = new LandsatProductDescriptor(name);
                         Calendar productDate = temporaryDescriptor.getAcquisitionDate();
                         if (startDate.before(productDate) && endDate.after(productDate)) {
-                            String jsonTile = tileUrl + name + "/" + name + "_MTL.json";
-                            jsonTile = jsonTile.replace("?delimiter=/&prefix=", "");
+                            String jsonTile = tileUrl + name + ProductDownloader.URL_SEPARATOR + name + "_MTL.json";
+                            jsonTile = jsonTile.replace(Constants.L8_SEARCH_URL_SUFFIX, "");
                             double clouds = getTileCloudPercentage(jsonTile);
                             if (clouds > this.cloudFilter) {
                                 productDate.add(Calendar.MONTH, -1);

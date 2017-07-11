@@ -1,0 +1,46 @@
+# Group identifier (n/a if independent) ; Short code ; Long code ; Args cardinality ; Value hint ; Value separator (if multiple) ; Optional ; Description
+
+# Common command line arguments
+1 ; o ; out ; 1 ; output folder ; ; false ; The folder in which the products will be downloaded
+1 ; i ; input ; 1 ; input folder ; ; false ; The folder in which the products are to be inspected
+2 ; a ; area ; n ; lon1,lat1 lon2,lat2 ... ; ' ' ; true ; A closed polygon whose vertices are given in <lon,lat> pairs, space-separated
+2 ; af ; areafile ; 1 ; file path and name ; ; true ; The file containing a closed polygon whose vertices are given in <lon lat> pairs, comma-separated
+2 ; ts ; shapetiles ; 1 ; file path and name ; ; true ; The KML file containing Sentinel-2 tile extents
+3 ; t ; tiles ; n ; tileId1 tileId2 ... ; ' ' ; true ; A list of S2 tile IDs, space-separated
+3 ; tf ; tilefile ; 1 ; file path and name ; ; true ; A file containing a list of S2 tile IDs, one tile id per line
+4 ; p ; products ; n ; product1 product2 ... ; ' ' ; true ; A list of S2/L8 product names, space-separated
+4 ; pf ; productfile ; 1 ; file path and name ; ; true ; A file containing a list of S2/L8 products, one product name per line
+n/a ; b ; bands ; n ; band1 band2 ... ; ' ' ; true ; The list of S2/L8 band names, space-separated, to be downloaded. If not specified, all bands are downloaded
+n/a ; start ; startdate ; 1 ; yyyy-MM-dd ; ; true ; Look for products from a specific date (formatted as yyyy-MM-dd). Default is current date -7 days
+n/a ; end ; enddate ; 1 ; yyyy-MM-dd ; ; true ; Look for products up to (and including) a specific date (formatted as yyyy-MM-dd). Default is current date
+n/a ; l ; limit ; 1 ; integer greater than 1 ; ; true ; The maximum number of products returned. Default is 10
+n/a ; s ; store ; 1 ; AWS|SCIHUB ; ; true ; Store of products being downloaded. Supported values are AWS or SCIHUB. Default is SCIHUB
+n/a ; sen ; sensor ; 1 ; S2|L8 ; ; true ; The sensor (product) type. Supported values are S2 or L8. Default is S2
+n/a ; cp ; cloudpercentage; 1 ; number between 0 and 100 ; ; true ; The threshold for cloud coverage of the products. Above this threshold, the products will be ignored. Default is 100
+n/a ; r ; resume ; 0 ; ; ; true ; Resume incomplete downloads
+n/a ; z ; zip ; 0 ; ; ; true ; Compress the product into a zip archive
+n/a ; d ; delete ; 0 ; ; ; true ; Delete the product files after compression
+n/a ; v ; verbose ; 0 ; ; ; true ; Produce verbose output/logs
+n/a ; q ; query ; 0 ; ; ; true ; Only perform query and return product names
+
+# Proxy parameters
+n/a ; ptype ; proxy.type ; 1 ; http|socks ; ; true ; Proxy type. Supported values are http or socks
+n/a ; phost ; proxy.host ; 1 ; host name or ip adress ; ; true ; Proxy host
+n/a ; pport ; proxy.port ; 1 ; integer greater than 0 ; ; true ; Proxy port
+n/a ; puser ; proxy.user ; 1 ; proxy user ; ; true ; Proxy user. Don't use it if the proxy doesn't require authentication
+n/a ; ppwd ; proxy.password ; 1 ; proxy password ; ; true ; Proxy password. Don't use it if the proxy doesn't require authentication
+
+# Sentinel-2 specific command line arguments
+n/a ; uuid ; uuid ; n ; uuid1 uuid2 ... ; ' ' ; true ; A list of S2 product unique identifiers, as retrieved from SciHub, space-separated
+n/a ; user ; user ; 1 ; SciHub login name ; ; true ; User account to connect to SCIHUB
+n/a ; pwd ; password ; 1 ; SciHub password ; ; true ; Password to connect to SCIHUB
+n/a ; s2t ; s2pt ; 1 ; S2MSI1C|S2MSI2Ap ; ; true ; Sentinel-2 product type. Supported values are S2MSI1C (for L1C) or S2MSI2Ap (for L2A). Default is S2MSI1C
+n/a ; ro ; relative.orbit ; 1 ; integer ; ; true ; Relative orbit number
+n/a ; ma ; ma ; 1 ; NONE|NAN|INTERPOLATE ; ; true ; Interpolation method for missing angles grids (if some are absent). Supported values are NONE (nothing to do), NAN (fill with NaN) or INTERPOLATE
+n/a ; aws ; aws ; 0 ; ; ; true ; Perform search directly into AWS (slower but doesn't go through SciHub)
+n/a ; u ; unpacked ; 0 ; ; ; true ; Download unpacked products (SciHub only)
+
+
+# Landsat 8 specific command line arguments
+n/a ; l8col ; l8col ; 1 ; PRE|C1 ; ; true ; Landsat 8 collection to be queried. Default is C1
+n/a ; l8t ; l8pt ; 1 ; RT|T1|T2 ; ; true ; Landsat 8 product Type. Supported values are RT, T1 or T2
