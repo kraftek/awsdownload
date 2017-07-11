@@ -28,6 +28,7 @@ import ro.cs.products.base.DownloadMode;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.base.SensorType;
 import ro.cs.products.base.TileMap;
+import ro.cs.products.landsat.CollectionCategory;
 import ro.cs.products.landsat.LandsatAWSSearch;
 import ro.cs.products.landsat.LandsatCollection;
 import ro.cs.products.landsat.LandsatProductDescriptor;
@@ -238,6 +239,14 @@ public class Executor {
                           .hasArg(true)
                           .required(false)
                           .build());
+        /* Landsat 8 product type */
+        options.addOption(Option.builder(Constants.PARAM_L8_PRODUCT_TYPE)
+                                  .longOpt("l8pt")
+                                  .argName("landsat8.product.type")
+                                  .desc("RT|T1|T2")
+                                  .hasArg(true)
+                                  .required(false)
+                                  .build());
         /* Cloud coverage percentage */
         options.addOption(Option.builder(Constants.PARAM_CLOUD_PERCENTAGE)
                 .longOpt("cloudpercentage")
@@ -667,7 +676,10 @@ public class Executor {
                     if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
                         searchProvider.setTiles(tiles);
                     }
-                    //((LandsatAWSSearch) searchProvider).limit(limit);
+                    if (commandLine.hasOption(Constants.PARAM_L8_PRODUCT_TYPE)) {
+                        searchProvider.setProductType(Enum.valueOf(CollectionCategory.class,
+                                                                   commandLine.getOptionValue(Constants.PARAM_L8_PRODUCT_TYPE)));
+                    }
                 } else if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS)) {
                     logger.debug("Search will be done on SciHub");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);

@@ -47,6 +47,7 @@ public class Constants {
     public static final String PARAM_SENSOR = "sen";
     public static final String PARAM_L8_COLLECTION = "l8col";
     public static final String PARAM_S2_PRODUCT_TYPE = "s2t";
+    public static final String PARAM_L8_PRODUCT_TYPE = "l8t";
     public static final double DEFAULT_CLOUD_PERCENTAGE = 100.0;
     public static final String DEFAULT_START_DATE = "NOW-7DAY";
     public static final String PATTERN_START_DATE = "NOW-%sDAY";

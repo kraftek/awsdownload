@@ -2,7 +2,6 @@ package ro.cs.products.landsat;
 
 import ro.cs.products.base.AbstractSearch;
 import ro.cs.products.base.ProductDescriptor;
-import ro.cs.products.sentinel2.ProductType;
 import ro.cs.products.sentinel2.SentinelTilesMap;
 import ro.cs.products.sentinel2.amazon.Result;
 import ro.cs.products.sentinel2.amazon.ResultParser;
@@ -31,7 +30,7 @@ import java.util.stream.Collectors;
 /**
  * @author Cosmin Cara
  */
-public class LandsatAWSSearch extends AbstractSearch<ProductType> {
+public class LandsatAWSSearch extends AbstractSearch<CollectionCategory> {
 
     public LandsatAWSSearch(String url) throws URISyntaxException {
         super(url);
@@ -69,20 +68,22 @@ public class LandsatAWSSearch extends AbstractSearch<ProductType> {
                         .map(p -> p.replace(productResult.getPrefix(), "").replace(productResult.getDelimiter(), ""))
                         .collect(Collectors.toSet());
                 for (String name : names) {
-                    LandsatProductDescriptor temporaryDescriptor = new LandsatProductDescriptor(name);
-                    Calendar productDate = temporaryDescriptor.getAcquisitionDate();
-                    if (startDate.before(productDate) && endDate.after(productDate)) {
-                        String jsonTile = tileUrl + name + "/" + name +"_MTL.json";
-                        jsonTile = jsonTile.replace("?delimiter=/&prefix=", "");
-                        double clouds = getTileCloudPercentage(jsonTile);
-                        if (clouds > this.cloudFilter) {
-                            productDate.add(Calendar.MONTH, -1);
-                            Logger.getRootLogger().warn(
-                                    String.format("Tile %s from %s has %.2f %% clouds",
-                                                  tile, dateFormat.format(productDate.getTime()), clouds));
-                        } else {
-                            ProductDescriptor descriptor = parseProductJson(jsonTile);
-                            results.put(descriptor.getName(), descriptor);
+                    if (this.productType != null && name.endsWith(this.productType.toString())) {
+                        LandsatProductDescriptor temporaryDescriptor = new LandsatProductDescriptor(name);
+                        Calendar productDate = temporaryDescriptor.getAcquisitionDate();
+                        if (startDate.before(productDate) && endDate.after(productDate)) {
+                            String jsonTile = tileUrl + name + "/" + name + "_MTL.json";
+                            jsonTile = jsonTile.replace("?delimiter=/&prefix=", "");
+                            double clouds = getTileCloudPercentage(jsonTile);
+                            if (clouds > this.cloudFilter) {
+                                productDate.add(Calendar.MONTH, -1);
+                                Logger.getRootLogger().warn(
+                                        String.format("Tile %s from %s has %.2f %% clouds",
+                                                      tile, dateFormat.format(productDate.getTime()), clouds));
+                            } else {
+                                ProductDescriptor descriptor = parseProductJson(jsonTile);
+                                results.put(descriptor.getName(), descriptor);
+                            }
                         }
                     }
                 }

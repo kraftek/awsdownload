@@ -34,11 +34,12 @@ import java.util.regex.Pattern;
  */
 public class LandsatProductDescriptor extends ProductDescriptor {
     private static final Pattern preCollectionNamePattern = Pattern.compile("L\\w[1-8](\\d{3})(\\d{3})(\\d{4})(\\d{3})\\w{3}\\d{2}");
-    private static final Pattern collection1NamePattern = Pattern.compile("L\\w\\d{2}_L[1-2]\\w{2}_(\\d{3})(\\d{3})_(\\d{4})(\\d{2})(\\d{2})_\\d{8}_\\d{2}_\\w{2}");
+    private static final Pattern collection1NamePattern = Pattern.compile("L\\w\\d{2}_L[1-2]\\w{2}_(\\d{3})(\\d{3})_(\\d{4})(\\d{2})(\\d{2})_\\d{8}_\\d{2}_(\\w{2})");
     private boolean oldFormat;
     private String[] nameTokens;
     private String row;
     private String path;
+    private CollectionCategory productType;
 
     public LandsatProductDescriptor() {
     }
@@ -56,6 +57,13 @@ public class LandsatProductDescriptor extends ProductDescriptor {
             this.version = this.oldFormat ? Constants.L8_PRECOLL : Constants.L8_COLL;
         }
         return this.version;
+    }
+
+    public CollectionCategory getProductType() {
+        if (this.productType == null) {
+            this.productType = Enum.valueOf(CollectionCategory.class, nameTokens[5]);
+        }
+        return this.productType;
     }
 
     String getRow() {
