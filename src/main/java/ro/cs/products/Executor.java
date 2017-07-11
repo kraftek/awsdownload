@@ -28,9 +28,10 @@ import ro.cs.products.base.DownloadMode;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.base.SensorType;
 import ro.cs.products.base.TileMap;
+import ro.cs.products.landsat.LandsatAWSSearch;
+import ro.cs.products.landsat.LandsatCollection;
 import ro.cs.products.landsat.LandsatProductDescriptor;
 import ro.cs.products.landsat.LandsatProductDownloader;
-import ro.cs.products.landsat.LandsatSearch;
 import ro.cs.products.landsat.LandsatTilesMap;
 import ro.cs.products.sentinel2.ProductStore;
 import ro.cs.products.sentinel2.ProductType;
@@ -221,6 +222,14 @@ public class Executor {
                 .hasArg(true)
                 .required(false)
                 .build());
+        /* Landsat8 collection type */
+        options.addOption(Option.builder(Constants.PARAM_L8_COLLECTION)
+                                  .longOpt("l8col")
+                                  .argName("enum")
+                                  .desc("PRE|C1")
+                                  .hasArg(true)
+                                  .required(false)
+                                  .build());
         /* Sentinel-2 product type */
         options.addOption(Option.builder(Constants.PARAM_S2_PRODUCT_TYPE)
                           .longOpt("s2pt")
@@ -422,6 +431,12 @@ public class Executor {
                 ProductType.S2MSI1C;
         DownloadMode downloadMode = commandLine.hasOption(Constants.PARAM_FLAG_RESUME) ?
                 DownloadMode.RESUME : DownloadMode.OVERWRITE;
+        LandsatCollection l8collection = null;
+        if (sensorType == SensorType.L8) {
+            l8collection = commandLine.hasOption(Constants.PARAM_L8_COLLECTION) ?
+                    Enum.valueOf(LandsatCollection.class, commandLine.getOptionValue(Constants.PARAM_L8_COLLECTION)) :
+                    LandsatCollection.C1;
+        }
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
             folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));
@@ -636,11 +651,13 @@ public class Executor {
                 logger.debug("No product provided, searching on the AOI");
                 if (sensorType == SensorType.L8) {
                     logger.debug("Search will be done for Landsat");
-                    searchUrl = props.getProperty(Constants.PROPERTY_NAME_LANDSAT_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL);
+                    searchUrl = l8collection != null && l8collection.equals(LandsatCollection.C1) ?
+                            props.getProperty(Constants.PROPERTY_NAME_LANDSAT_AWS_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL) :
+                            props.getProperty(Constants.PROPERTY_NAME_LANDSAT_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL);
                     if (!NetUtils.isAvailable(searchUrl)) {
                         logger.warn(searchUrl + " is not available!");
                     }
-                    searchProvider = new LandsatSearch(searchUrl);
+                    searchProvider = new LandsatAWSSearch(searchUrl);
                     if (commandLine.hasOption(Constants.PARAM_START_DATE)) {
                         searchProvider.setSensingStart(commandLine.getOptionValue(Constants.PARAM_START_DATE));
                     }
@@ -650,7 +667,7 @@ public class Executor {
                     if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
                         searchProvider.setTiles(tiles);
                     }
-                    ((LandsatSearch) searchProvider).limit(limit);
+                    //((LandsatAWSSearch) searchProvider).limit(limit);
                 } else if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS)) {
                     logger.debug("Search will be done on SciHub");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);

@@ -45,6 +45,7 @@ public class Constants {
     public static final String PARAM_USER = "user";
     public static final String PARAM_PASSWORD = "pwd";
     public static final String PARAM_SENSOR = "sen";
+    public static final String PARAM_L8_COLLECTION = "l8col";
     public static final String PARAM_S2_PRODUCT_TYPE = "s2t";
     public static final double DEFAULT_CLOUD_PERCENTAGE = 100.0;
     public static final String DEFAULT_START_DATE = "NOW-7DAY";
@@ -53,8 +54,9 @@ public class Constants {
     public static final int DEFAULT_RESULTS_LIMIT = 10;
     public static final String PROPERTY_NAME_SEARCH_URL = "scihub.search.url";
     public static final String PROPERTY_NAME_AWS_SEARCH_URL = "s2.aws.search.url";
-    public static final String PROPERTY_NAME_LANDSAT_SEARCH_URL = "l8.search.url";
-    public static final String PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL = "https://api.developmentseed.org/landsat";
+    public static final String PROPERTY_NAME_LANDSAT_SEARCH_URL = "l8.aws.pre.search.url";
+    public static final String PROPERTY_NAME_LANDSAT_AWS_SEARCH_URL = "l8.aws.search.url";
+    public static final String PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL = "https://landsat-pds.s3.amazonaws.com/?delimiter=/&prefix=c1/L8/";
     public static final String PROPERTY_DEFAULT_SEARCH_URL = "https://scihub.copernicus.eu/apihub/search";
     public static final String PROPERTY_DEFAULT_AWS_SEARCH_URL = "http://sentinel-products-l1c.s3.amazonaws.com/?delimiter=/&prefix=tiles/";
     public static final String PROPERTY_NAME_SEARCH_URL_SECONDARY = "scihub.search.backup.url";

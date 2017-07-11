@@ -19,6 +19,12 @@ import ro.cs.products.ProductDownloader;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.util.Constants;
 
+import java.time.LocalDate;
+import java.time.Year;
+import java.time.ZoneId;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -85,6 +91,27 @@ public class LandsatProductDescriptor extends ProductDescriptor {
         buffer.append(getRow()).append(ProductDownloader.URL_SEPARATOR);
         buffer.append(this.name).append(ProductDownloader.URL_SEPARATOR);
         return buffer.toString();
+    }
+
+    Calendar getAcquisitionDate() {
+        Calendar calendar = Calendar.getInstance();
+        LocalDate localDate = null;
+        Matcher matcher;
+        if (this.oldFormat) {
+            matcher = preCollectionNamePattern.matcher(name);
+            //noinspection ResultOfMethodCallIgnored
+            matcher.matches();
+            localDate = Year.of(Integer.parseInt(matcher.group(3))).atDay(Integer.parseInt(matcher.group(4)));
+        } else {
+            matcher = collection1NamePattern.matcher(name);
+            //noinspection ResultOfMethodCallIgnored
+            matcher.matches();
+            localDate = LocalDate.parse(matcher.group(3)
+                                                + "-" + matcher.group(4)
+                                                + "-" + matcher.group(5));
+        }
+        calendar.setTime(Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()));
+        return calendar;
     }
 
     @Override
