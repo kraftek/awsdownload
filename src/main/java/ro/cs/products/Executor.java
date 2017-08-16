@@ -37,9 +37,11 @@ import ro.cs.products.landsat.LandsatTilesMap;
 import ro.cs.products.sentinel2.ProductStore;
 import ro.cs.products.sentinel2.ProductType;
 import ro.cs.products.sentinel2.S2L1CProductDescriptor;
+import ro.cs.products.sentinel2.Sentinel2PreOpsDownloader;
 import ro.cs.products.sentinel2.SentinelProductDownloader;
 import ro.cs.products.sentinel2.SentinelTilesMap;
 import ro.cs.products.sentinel2.amazon.AmazonSearch;
+import ro.cs.products.sentinel2.scihub.PreOpsSciHubSearch;
 import ro.cs.products.sentinel2.scihub.SciHubSearch;
 import ro.cs.products.sentinel2.workaround.FillAnglesMethod;
 import ro.cs.products.sentinel2.workaround.ProductInspector;
@@ -258,13 +260,15 @@ public class Executor {
 
             String user = commandLine.getOptionValue(Constants.PARAM_USER);
             String pwd = commandLine.getOptionValue(Constants.PARAM_PASSWORD);
+            NetUtils sciHubNetUtils = new NetUtils();
             if (user != null && pwd != null && !user.isEmpty() && !pwd.isEmpty()) {
                 String authToken = "Basic " + new String(Base64.getEncoder().encode((user + ":" + pwd).getBytes()));
-                NetUtils.setAuthToken(authToken);
+                sciHubNetUtils.setAuthToken(authToken);
             }
 
             ProductDownloader downloader = sensorType.equals(SensorType.S2) ?
-                    new SentinelProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER), props) :
+                    new SentinelProductDownloader(source, commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER),
+                                                  props, sciHubNetUtils) :
                     new LandsatProductDownloader(commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER), props);
             downloader.setDownloadMode(downloadMode);
             TileMap tileMap = sensorType == SensorType.S2 ?
@@ -391,7 +395,7 @@ public class Executor {
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getMaxY());
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getY());
             }
-
+            boolean searchPreOps = commandLine.hasOption(Constants.PARAM_FLAG_PREOPS);
             numPoints = areaOfInterest.getNumPoints();
             if (products.size() == 0 && numPoints > 0) {
                 String searchUrl;
@@ -402,7 +406,8 @@ public class Executor {
                     searchUrl = l8collection != null && l8collection.equals(LandsatCollection.C1) ?
                             props.getProperty(Constants.PROPERTY_NAME_LANDSAT_AWS_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL) :
                             props.getProperty(Constants.PROPERTY_NAME_LANDSAT_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL);
-                    if (!NetUtils.isAvailable(searchUrl)) {
+                    NetUtils netUtils = new NetUtils();
+                    if (!netUtils.isAvailable(searchUrl)) {
                         logger.warn(searchUrl + " is not available!");
                     }
                     searchProvider = new LandsatAWSSearch(searchUrl);
@@ -422,15 +427,16 @@ public class Executor {
                 } else if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS)) {
                     logger.debug("Search will be done on SciHub");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
-                    if (!NetUtils.isAvailable(searchUrl)) {
+                    if (!sciHubNetUtils.isAvailable(searchUrl)) {
                         logger.warn(searchUrl + " is not available!");
                         searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
                     }
                     searchProvider = new SciHubSearch(searchUrl, productType);
                     SciHubSearch search = (SciHubSearch) searchProvider;
                     if (user != null && !user.isEmpty() && pwd != null && !pwd.isEmpty()) {
-                        search = search.auth(user, pwd);
+                        searchProvider = searchProvider.auth(user, pwd);
                     }
+
                     String interval = "[" + sensingStart + " TO " + sensingEnd + "]";
                     search.filter(Constants.SEARCH_PARAM_INTERVAL, interval).limit(limit);
                     if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
@@ -458,6 +464,20 @@ public class Executor {
                     searchProvider.setAreaOfInterest(areaOfInterest);
                 }
                 searchProvider.setClouds(clouds);
+                if (searchPreOps) {
+                    String preOpsSearchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_PREOPS_URL, Constants.PROPERTY_DEFAULT_SEARCH_PREOPS_URL);
+                    NetUtils preOpsNetUtils = new NetUtils();
+                    String authToken = "Basic " + new String(Base64.getEncoder().encode(("s2bguest:s2bguest").getBytes()));
+                    preOpsNetUtils.setAuthToken(authToken);
+                    if (!preOpsNetUtils.isAvailable(preOpsSearchUrl)) {
+                        logger.warn(preOpsSearchUrl + " is not available!");
+                    } else {
+                        PreOpsSciHubSearch secondarySearch = new PreOpsSciHubSearch(preOpsSearchUrl, productType);
+                        secondarySearch.auth("s2bguest", "s2bguest");
+                        secondarySearch.copyFiltersFrom(searchProvider);
+                        searchProvider.setAdditionalProvider(secondarySearch);
+                    }
+                }
                 products = searchProvider.execute();
                 if (searchMode) {
                     Path resultFile = Paths.get(folder).resolve("results.txt");
@@ -472,7 +492,19 @@ public class Executor {
             }
             if (!searchMode) {
                 if (downloader instanceof SentinelProductDownloader) {
-                    ((SentinelProductDownloader) downloader).setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
+                    SentinelProductDownloader sentinelProductDownloader = (SentinelProductDownloader) downloader;
+                    sentinelProductDownloader.setFilteredTiles(tiles, commandLine.hasOption(Constants.PARAM_FLAG_UNPACKED));
+                    if (searchPreOps) {
+                        NetUtils preOpsNetUtils = new NetUtils();
+                        String authToken = "Basic " + new String(Base64.getEncoder().encode(("s2bguest:s2bguest").getBytes()));
+                        preOpsNetUtils.setAuthToken(authToken);
+                        Sentinel2PreOpsDownloader additional =
+                                new Sentinel2PreOpsDownloader(source,
+                                                              commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER),
+                                                              props, preOpsNetUtils);
+                        additional.copyOptionsFrom(sentinelProductDownloader);
+                        sentinelProductDownloader.setAdditionalDownloader(additional);
+                    }
                 }
                 if (commandLine.hasOption(Constants.PARAM_BAND_LIST)) {
                     downloader.setBandList(commandLine.getOptionValues(Constants.PARAM_BAND_LIST));

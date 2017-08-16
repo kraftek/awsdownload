@@ -21,6 +21,12 @@ public class S2L2AProductDescriptor extends SentinelProductDescriptor {
     }
 
     @Override
+    public PlatformType getPlatform() {
+        String[] tokens = getTokens(ProductV14, this.name, null);
+        return Enum.valueOf(PlatformType.class, tokens[0]);
+    }
+
+    @Override
     public String getVersion() {
         if (this.version == null) {
             this.version = Constants.PSD_14;;

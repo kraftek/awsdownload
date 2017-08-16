@@ -53,7 +53,7 @@ public class AmazonSearch extends AbstractSearch<ProductType> {
     }
 
     @Override
-    public List<ProductDescriptor> execute() throws Exception {
+    protected List<ProductDescriptor> executeImpl() throws Exception {
         Map<String, ProductDescriptor> results = new LinkedHashMap<>();
         Set<String> tiles = this.tiles != null && this.tiles.size() > 0 ?
                 this.tiles :

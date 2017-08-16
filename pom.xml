@@ -6,7 +6,7 @@
 
     <groupId>ro.cs.products</groupId>
     <artifactId>ProductDownload</artifactId>
-    <version>1.5.1</version>
+    <version>1.6</version>
     <packaging>jar</packaging>
 
     <name>Sentinel2 and Landsat8 products downloader</name>

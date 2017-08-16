@@ -46,7 +46,6 @@ import java.util.List;
  */
 public class LandsatSearch extends AbstractSearch<Object> {
 
-    private List<NameValuePair> params;
     private List<NameValuePair> keyValues;
     //private CredentialsProvider credsProvider;
     private UsernamePasswordCredentials credentials;
@@ -158,7 +157,8 @@ public class LandsatSearch extends AbstractSearch<Object> {
         return result;
     }
 
-    public List<ProductDescriptor> execute() throws IOException {
+    @Override
+    protected List<ProductDescriptor> executeImpl() throws IOException {
         List<ProductDescriptor> results = new ArrayList<>();
         String queryUrl = getQuery();
         Logger.getRootLogger().info(queryUrl);

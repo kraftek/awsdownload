@@ -50,6 +50,14 @@ public class S2L1CProductDescriptor extends SentinelProductDescriptor {
     }
 
     @Override
+    public PlatformType getPlatform() {
+        String[] tokens = this.oldFormat ?
+                getTokens(ProductV13, this.name, null) :
+                getTokens(ProductV14, this.name, null);
+        return Enum.valueOf(PlatformType.class, tokens[0]);
+    }
+
+    @Override
     public String getVersion() {
         if (this.version == null) {
             this.version = this.oldFormat ? Constants.PSD_13 : Constants.PSD_14;;

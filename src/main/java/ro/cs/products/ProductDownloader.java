@@ -57,23 +57,31 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
     protected String destination;
     protected String baseUrl;
 
-    private String currentProduct;
+    protected String currentProduct;
     protected String currentStep;
 
     protected boolean shouldCompress;
     protected boolean shouldDeleteAfterCompression;
-    private DownloadMode downloadMode;
+    protected DownloadMode downloadMode;
 
     protected Logger.ScopeLogger productLogger;
 
-    private BatchProgressListener batchProgressListener;
-    private ProgressListener fileProgressListener;
+    protected BatchProgressListener batchProgressListener;
+    protected ProgressListener fileProgressListener;
 
     protected Set<String> bands;
 
-    public ProductDownloader(String targetFolder, Properties properties) {
+    protected NetUtils netUtils;
+    protected ProductDownloader<T> additionalDownloader;
+
+    public ProductDownloader(String targetFolder, Properties properties, NetUtils netUtils) {
         this.destination = targetFolder;
         this.props = properties;
+        this.netUtils = netUtils;
+    }
+
+    public void setAdditionalDownloader(ProductDownloader<T> anotherDownloader) {
+        this.additionalDownloader = anotherDownloader;
     }
 
     void setProgressListener(BatchProgressListener listener) {
@@ -103,12 +111,20 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
                     Utilities.ensureExists(Paths.get(destination));
                     file = download(product);
                     if (file == null) {
-                        retCode = ReturnCode.EMPTY_PRODUCT;
-                        getLogger().warn("Product download aborted");
+                        if (this.additionalDownloader != null && this.additionalDownloader.isIntendedFor(product)) {
+                            file = this.additionalDownloader.download(product);
+                            if (file == null) {
+                                retCode = ReturnCode.EMPTY_PRODUCT;
+                            }
+                        } else {
+                            retCode = ReturnCode.EMPTY_PRODUCT;
+                        }
+                        if (retCode == ReturnCode.EMPTY_PRODUCT) {
+                            getLogger().warn("(" + currentProduct + ") Product download aborted");
+                        }
                     }
                 } catch (IOException ignored) {
-                    getLogger().warn("IO Exception: " + ignored.getMessage());
-                    getLogger().warn("Product download failed");
+                    getLogger().warn("(" + currentProduct + ") IO Exception: " + ignored.getMessage());
                     retCode = ReturnCode.DOWNLOAD_ERROR;
                 } finally {
                     if (productLogger != null) {
@@ -123,7 +139,7 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
                 }
                 long millis = System.currentTimeMillis() - startTime;
                 if (file != null && Files.exists(file)) {
-                    getLogger().info("Product download completed in %s", Utilities.formatTime(millis));
+                    getLogger().info("(" + currentProduct + ") Download completed in %s", Utilities.formatTime(millis));
                 }
                 if (batchProgressListener != null) {
                     batchProgressListener.notifyProgress((double) productCounter / (double) productCount);
@@ -146,6 +162,8 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
     protected abstract String getMetadataUrl(T descriptor);
 
     protected abstract Path download(T product) throws IOException;
+
+    protected abstract boolean isIntendedFor(T product);
 
     protected Path downloadFile(String remoteUrl, Path file) throws IOException {
         return downloadFile(remoteUrl, file, null);

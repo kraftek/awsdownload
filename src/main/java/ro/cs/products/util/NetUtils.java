@@ -29,7 +29,14 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.Authenticator;
+import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.Proxy;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.List;
 import java.util.Map;
 
@@ -40,17 +47,17 @@ import java.util.Map;
  */
 public class NetUtils {
 
-    private static String authToken;
+    private String authToken;
     private static Proxy javaNetProxy;
     private static HttpHost apacheHttpProxy;
     private static CredentialsProvider proxyCredentials;
     private static int timeout = 30000;
 
-    public static void setAuthToken(String value) {
+    public void setAuthToken(String value) {
         authToken = value;
     }
 
-    public static String getAuthToken() {
+    public String getAuthToken() {
         return authToken;
     }
 
@@ -76,15 +83,16 @@ public class NetUtils {
         timeout = newTimeout;
     }
 
-    public static boolean isAvailable(String url) {
+    public boolean isAvailable(String url) {
         boolean status;
         try {
             Logger.getRootLogger().debug("Verifying url: %s", url);
             HttpURLConnection connection = openConnection(url, authToken);
             connection.setRequestMethod("GET");
             connection.connect();
-            status = (200 == connection.getResponseCode() || 400 == connection.getResponseCode());
-            Logger.getRootLogger().debug("Url status: %s [code %s]", url, connection.getResponseCode());
+            final int responseCode = connection.getResponseCode();
+            status = (200 == responseCode || 400 == responseCode || 401 == responseCode);
+            Logger.getRootLogger().debug("Url status: %s [code %s]", url, responseCode);
         } catch (Exception e) {
             Logger.getRootLogger().debug("Verification failed: %s", e.getMessage());
             status = false;

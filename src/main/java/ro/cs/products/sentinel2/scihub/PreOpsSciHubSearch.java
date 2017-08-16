@@ -15,6 +15,7 @@
  */
 package ro.cs.products.sentinel2.scihub;
 
+import org.apache.http.NameValuePair;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.message.BasicNameValuePair;
@@ -27,21 +28,28 @@ import ro.cs.products.sentinel2.S2L2AProductDescriptor;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.NetUtils;
 
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
 import java.io.IOException;
+import java.io.StringReader;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Class that issues queries to ESA's SciHub for retrieving product names.
  *
  * @author Cosmin Cara
  */
-public class SciHubSearch extends AbstractSearch<ProductType> {
+public class PreOpsSciHubSearch extends AbstractSearch<ProductType> {
 
-    protected String filter;
+    private String filter;
+    //private CredentialsProvider credsProvider;
 
-    public SciHubSearch(String url, ProductType type) throws URISyntaxException {
+    public PreOpsSciHubSearch(String url, ProductType type) throws URISyntaxException {
         super(url);
         this.productType = type;
         this.filter = "platformName:Sentinel-2";
@@ -51,39 +59,39 @@ public class SciHubSearch extends AbstractSearch<ProductType> {
         this.params = new ArrayList<>();
     }
 
-    public SciHubSearch filter(String key, String value) {
+    public PreOpsSciHubSearch filter(String key, String value) {
         if (key != null && !key.isEmpty() && value != null && !value.isEmpty()) {
             this.filter += " AND " + key + ":" + value;
         }
         return this;
     }
 
-    public SciHubSearch filter(List<String> productNames) {
+    public PreOpsSciHubSearch filter(List<String> productNames) {
         if (productNames != null) {
-            String list = "(";
+            StringBuilder list = new StringBuilder("(");
             boolean more = productNames.size() > 1;
             for (String productName : productNames) {
-                list += productName;
+                list.append(productName);
                 if (more) {
-                    list += " OR ";
+                    list.append(" OR ");
                 }
             }
             if (more) {
-                list = list.substring(0, list.length() - 4) + ")";
+                list = new StringBuilder(list.substring(0, list.length() - 4) + ")");
             }
             this.filter += " AND " + list;
         }
         return this;
     }
 
-    public SciHubSearch limit(int number) {
+    public PreOpsSciHubSearch limit(int number) {
         if (number > 0) {
             params.add(new BasicNameValuePair("rows", String.valueOf(number)));
         }
         return this;
     }
 
-    public SciHubSearch start(int start) {
+    public PreOpsSciHubSearch start(int start) {
         if (start >= 0) {
             params.add(new BasicNameValuePair("start",String.valueOf(start)));
         }
@@ -109,7 +117,25 @@ public class SciHubSearch extends AbstractSearch<ProductType> {
     }
 
     private String getQuery() {
-        params.add(new BasicNameValuePair("q", filter));
+        Optional<NameValuePair> valuePair = params.stream().filter(p -> p.getName().equals("q")).findFirst();
+        valuePair.ifPresent(nameValuePair -> params.remove(nameValuePair));
+        valuePair = params.stream().filter(p -> p.getName().equals("start")).findFirst();
+        String offset = "0";
+        if (valuePair.isPresent()) {
+            NameValuePair nameValuePair = valuePair.get();
+            offset = nameValuePair.getValue();
+            params.remove(nameValuePair);
+        }
+        valuePair = params.stream().filter(p -> p.getName().equals("rows")).findFirst();
+        String limit = "10";
+        if (valuePair.isPresent()) {
+            NameValuePair nameValuePair = valuePair.get();
+            limit = nameValuePair.getValue();
+            params.remove(nameValuePair);
+        }
+        params.add(new BasicNameValuePair("filter", filter));
+        params.add(new BasicNameValuePair("offset", offset));
+        params.add(new BasicNameValuePair("limit", limit));
         return this.url.toString() + "?" + URLEncodedUtils.format(params, "UTF-8").replace("+", "%20");
     }
 
@@ -123,35 +149,24 @@ public class SciHubSearch extends AbstractSearch<ProductType> {
         try (CloseableHttpResponse response = NetUtils.openConnection(queryUrl, credentials)) {
             switch (response.getStatusLine().getStatusCode()) {
                 case 200:
-                    String[] strings = EntityUtils.toString(response.getEntity()).split("\n");
+                    final JsonReader reader = Json.createReader(new StringReader(EntityUtils.toString(response.getEntity())));
+                    JsonArray readArray = reader.readArray();
                     ProductDescriptor currentProduct = null;
                     double currentClouds;
-                    for (String string : strings) {
-                        if (string.contains("<entry>")) {
-                            currentProduct = (this.productType == null || ProductType.S2MSI1C.equals(this.productType)) ?
+                    for (int i = 0; i < readArray.size(); i++) {
+                        JsonObject jsonProduct = readArray.getJsonObject(i);
+                        currentProduct = (this.productType == null || ProductType.S2MSI1C.equals(this.productType)) ?
                                     new S2L1CProductDescriptor() : new S2L2AProductDescriptor();
-                        } else if (string.contains("</entry>")) {
-                            if (currentProduct != null) {
-                                double cloudsPercentage = currentProduct.getCloudsPercentage();
-                                if (cloudFilter == 0 || cloudsPercentage <= cloudFilter) {
-                                    results.add(currentProduct);
-                                } else {
-                                    Logger.getRootLogger().info("%s skipped [clouds: %s]", currentProduct, cloudsPercentage);
-                                }
-                            }
-                        } else if (string.contains("<title>")) {
-                            if (currentProduct != null) {
-                                currentProduct.setName(string.replace("<title>", "").replace("</title>", ""));
-                            }
-                        } else if (string.contains("cloudcoverpercentage")) {
-                            currentClouds = Double.parseDouble(string.replace("<double name=\"cloudcoverpercentage\">", "").replace("</double>", ""));
-                            if (currentProduct != null) {
-                                currentProduct.setCloudsPercentage(currentClouds);
-                            }
-                        } else if (string.contains("<id>")) {
-                            if (currentProduct != null) {
-                                currentProduct.setId(string.replace("<id>", "").replace("</id>", ""));
-                            }
+                        currentProduct.setName(jsonProduct.getString("identifier"));
+                        currentProduct.setId(jsonProduct.getString("uuid"));
+                        currentClouds = Double.parseDouble(jsonProduct.getJsonArray("indexes").getJsonObject(0)
+                                                                   .getJsonArray("children").getJsonObject(0)
+                                                                   .getString("value"));
+                        if (cloudFilter == 0 || currentClouds <= cloudFilter) {
+                            currentProduct.setCloudsPercentage(currentClouds);
+                            results.add(currentProduct);
+                        } else {
+                            Logger.getRootLogger().info("%s skipped [clouds: %s]", currentProduct, currentClouds);
                         }
                     }
                     break;
@@ -163,7 +178,7 @@ public class SciHubSearch extends AbstractSearch<ProductType> {
                     break;
             }
         }
-        Logger.getRootLogger().info("Query returned %s Sentinel-2A products", results.size());
+        Logger.getRootLogger().info("Query returned %s Sentinel-2B products", results.size());
         return results;
     }
 

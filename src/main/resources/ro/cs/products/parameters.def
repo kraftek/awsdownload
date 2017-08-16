@@ -39,6 +39,7 @@ n/a ; ro ; relative.orbit ; 1 ; integer ; ; true ; Relative orbit number
 n/a ; ma ; ma ; 1 ; NONE|NAN|INTERPOLATE ; ; true ; Interpolation method for missing angles grids (if some are absent). Supported values are NONE (nothing to do), NAN (fill with NaN) or INTERPOLATE
 n/a ; aws ; aws ; 0 ; ; ; true ; Perform search directly into AWS (slower but doesn't go through SciHub)
 n/a ; u ; unpacked ; 0 ; ; ; true ; Download unpacked products (SciHub only)
+n/a ; pre ; preops ; 0 ; ; ; true ; Search for Sentinel-2B products in the Pre-Operational Hub
 
 
 # Landsat 8 specific command line arguments

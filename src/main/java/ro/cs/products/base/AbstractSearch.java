@@ -15,6 +15,8 @@
  */
 package ro.cs.products.base;
 
+import org.apache.http.NameValuePair;
+import org.apache.http.auth.UsernamePasswordCredentials;
 import ro.cs.products.util.Polygon2D;
 
 import java.net.URI;
@@ -36,10 +38,29 @@ public abstract class AbstractSearch<T extends Object> {
     protected int relativeOrbit;
     protected Set<String> tiles;
     protected T productType;
+    protected AbstractSearch<T> additionalProvider;
+    protected List<NameValuePair> params;
+    protected UsernamePasswordCredentials credentials;
 
     public AbstractSearch(String url) throws URISyntaxException {
         this.url = new URI(url);
         this.cloudFilter = Double.MAX_VALUE;
+    }
+
+    public AbstractSearch<T> auth(String user, String pwd) {
+        this.credentials = new UsernamePasswordCredentials(user, pwd);
+        return this;
+    }
+
+    public void copyFiltersFrom(AbstractSearch<T> anotherSearch) {
+        this.aoi = anotherSearch.aoi;
+        this.cloudFilter = anotherSearch.cloudFilter;
+        this.sensingStart = anotherSearch.sensingStart;
+        this.sensingEnd = anotherSearch.sensingEnd;
+        this.relativeOrbit = anotherSearch.relativeOrbit;
+        this.tiles = anotherSearch.tiles;
+        this.productType = anotherSearch.productType;
+        this.params = anotherSearch.params;
     }
 
     public void setSensingStart(String sensingStart) {
@@ -66,5 +87,19 @@ public abstract class AbstractSearch<T extends Object> {
 
     public T getProductType() { return this.productType; }
 
-    public abstract List<ProductDescriptor> execute() throws Exception;
+    public void setAdditionalProvider(AbstractSearch<T> provider) {
+        this.additionalProvider = provider;
+    }
+
+    public List<ProductDescriptor> execute() throws Exception {
+        List<ProductDescriptor> products = executeImpl();
+        if (hasAdditionalProvider()) {
+            products.addAll(this.additionalProvider.execute());
+        }
+        return products;
+    }
+
+    protected abstract List<ProductDescriptor> executeImpl() throws Exception;
+
+    protected boolean hasAdditionalProvider() { return this.additionalProvider != null; }
 }

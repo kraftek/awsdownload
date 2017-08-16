@@ -39,6 +39,7 @@ public class Constants {
     public static final String PARAM_FLAG_RESUME = "r";
     public static final String PARAM_FLAG_COMPRESS = "z";
     public static final String PARAM_FLAG_DELETE = "d";
+    public static final String PARAM_FLAG_PREOPS = "pre";
     public static final String PARAM_DOWNLOAD_STORE = "s";
     public static final String PARAM_FLAG_UNPACKED = "u";
     public static final String PARAM_FLAG_SEARCH_AWS = "aws";
@@ -54,11 +55,15 @@ public class Constants {
     public static final String DEFAULT_END_DATE = "NOW";
     public static final int DEFAULT_RESULTS_LIMIT = 10;
     public static final String PROPERTY_NAME_SEARCH_URL = "scihub.search.url";
+    public static final String PROPERTY_NAME_SEARCH_PREOPS_URL = "preops.scihub.search.url";
+    public static final String PROPERTY_NAME_SCIHUB_PRODUCTS_URL = "scihub.product.url";
+    public static final String PROPERTY_NAME_SCIHUB_PREOPS_PRODUCTS_URL = "preops.scihub.product.url";
     public static final String PROPERTY_NAME_AWS_SEARCH_URL = "s2.aws.search.url";
     public static final String PROPERTY_NAME_LANDSAT_SEARCH_URL = "l8.aws.pre.search.url";
     public static final String PROPERTY_NAME_LANDSAT_AWS_SEARCH_URL = "l8.aws.search.url";
     public static final String PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL = "https://landsat-pds.s3.amazonaws.com/?delimiter=/&prefix=c1/L8/";
     public static final String PROPERTY_DEFAULT_SEARCH_URL = "https://scihub.copernicus.eu/apihub/search";
+    public static final String PROPERTY_DEFAULT_SEARCH_PREOPS_URL = "https://scihub.copernicus.eu/s2b/api/stub/products";
     public static final String PROPERTY_DEFAULT_AWS_SEARCH_URL = "http://sentinel-products-l1c.s3.amazonaws.com/?delimiter=/&prefix=tiles/";
     public static final String PROPERTY_NAME_SEARCH_URL_SECONDARY = "scihub.search.backup.url";
     public static final String PROPERTY_DEFAULT_SEARCH_URL_SECONDARY = "https://scihub.copernicus.eu/dhus/search";
@@ -94,4 +99,11 @@ public class Constants {
     public static final String FOLDER_DATASTRIP = "DATASTRIP";
     public static final String FOLDER_IMG_DATA = "IMG_DATA";
     public static final String FOLDER_QI_DATA = "QI_DATA";
+    public static final String PROPERTY_DEFAULT_SCIHUB_PRODUCTS_URL = "https://scihub.copernicus.eu/apihub/odata/v1";
+    public static final String PROPERTY_NAME_SCIHUB_BACKUP_SEARCH_URL = "scihub.product.backup.url";
+    public static final String PROPERTY_DEFAULT_SCIHUB_BACKUP_SEARCH_URL = "https://scihub.copernicus.eu/dhus/odata/v1";
+
+    public static final String PROPERTY_NAME_AWS_TILES_URL = "s2.aws.tiles.url";
+    public static final String PROPERTY_DEFAULT_AWS_TILES_URL = "http://sentinel-products-l1c.s3-website.eu-central-1.amazonaws.com";
+    public static final String PROPERTY_DEFAULT_SCIHUB_PREOPS_PRODUCTS_URL = "https://scihub.copernicus.eu/s2b/odata/v1";
 }

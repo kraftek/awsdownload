@@ -51,7 +51,7 @@ public class LandsatProductDownloader extends ProductDownloader<LandsatProductDe
     }};
 
     public LandsatProductDownloader(String targetFolder, Properties properties) {
-        super(targetFolder, properties);
+        super(targetFolder, properties, null);
 
         baseUrl = props.getProperty("l8.aws.products.url", "http://landsat-pds.s3.amazonaws.com/");
         if (!baseUrl.endsWith("/"))
@@ -115,5 +115,10 @@ public class LandsatProductDownloader extends ProductDownloader<LandsatProductDe
     @Override
     protected String getProductUrl(LandsatProductDescriptor descriptor) {
         return baseUrl + descriptor.getProductRelativePath();
+    }
+
+    @Override
+    protected boolean isIntendedFor(LandsatProductDescriptor product) {
+        return true;
     }
 }

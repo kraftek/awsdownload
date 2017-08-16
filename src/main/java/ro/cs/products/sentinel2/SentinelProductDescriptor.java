@@ -13,6 +13,8 @@ public abstract class SentinelProductDescriptor extends ProductDescriptor {
         super(name);
     }
 
+    abstract PlatformType getPlatform();
+
     abstract String getTileIdentifier();
 
     abstract String getMetadataFileName();

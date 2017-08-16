@@ -121,40 +121,43 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
         add("SNW_60m.jp2");
     }};
 
-    private String productsUrl;
-    private String baseUrl;
-    private String zipsUrl;
-    private String odataProductPath;
-    private String odataArchivePath;
-    private String odataTilePath;
-    private String odataMetadataPath;
+    String productsUrl;
+    String baseUrl;
+    String zipsUrl;
+    String odataProductPath;
+    String odataArchivePath;
+    String odataTilePath;
+    String odataMetadataPath;
 
-    private Set<String> filteredTiles;
-    private boolean shouldFilterTiles;
-    private Pattern tileIdPattern;
-    private FillAnglesMethod fillMissingAnglesMethod;
+    Set<String> filteredTiles;
+    boolean shouldFilterTiles;
+    Pattern tileIdPattern;
+    FillAnglesMethod fillMissingAnglesMethod;
 
-    private ProductStore store;
+    ProductStore store;
 
-    private Logger.ScopeLogger productLogger;
+    Logger.ScopeLogger productLogger;
 
-    public SentinelProductDownloader(ProductStore source, String targetFolder, Properties properties) {
-        super(targetFolder, properties);
+    public SentinelProductDownloader(ProductStore source, String targetFolder, Properties properties, NetUtils netUtils) {
+        super(targetFolder, properties, netUtils);
         this.store = source;
 
-        zipsUrl = props.getProperty("s2.aws.products.url", "http://sentinel-products-l1c.s3.amazonaws.com");
+        zipsUrl = props.getProperty(Constants.PROPERTY_NAME_AWS_SEARCH_URL, Constants.PROPERTY_DEFAULT_AWS_SEARCH_URL);
         if (!zipsUrl.endsWith("/"))
             zipsUrl += "/";
         zipsUrl += "zips/";
-        baseUrl = props.getProperty("s2.aws.tiles.url", "http://sentinel-products-l1c.s3-website.eu-central-1.amazonaws.com");
+        baseUrl = props.getProperty(Constants.PROPERTY_NAME_AWS_TILES_URL, Constants.PROPERTY_DEFAULT_AWS_TILES_URL);
         if (!baseUrl.endsWith("/"))
             baseUrl += "/";
         productsUrl = baseUrl + "products/";
         ODataPath odp = new ODataPath();
-        String scihubUrl = props.getProperty("scihub.product.url", "https://scihub.copernicus.eu/apihub/odata/v1");
-        if (source.equals(ProductStore.SCIHUB) && !NetUtils.isAvailable(scihubUrl)) {
+        String scihubUrl;
+        scihubUrl = props.getProperty(Constants.PROPERTY_NAME_SCIHUB_PRODUCTS_URL,
+                                      Constants.PROPERTY_DEFAULT_SCIHUB_PRODUCTS_URL);
+        if (source.equals(ProductStore.SCIHUB) && !this.netUtils.isAvailable(scihubUrl)) {
             System.err.println(scihubUrl + " is not available!");
-            scihubUrl = props.getProperty("scihub.product.backup.url", "https://scihub.copernicus.eu/dhus/odata/v1");
+            scihubUrl = props.getProperty(Constants.PROPERTY_NAME_SCIHUB_BACKUP_SEARCH_URL,
+                                          Constants.PROPERTY_DEFAULT_SCIHUB_BACKUP_SEARCH_URL);
         }
         odataProductPath = odp.root(scihubUrl + "/Products('${UUID}')").node("${PRODUCT_NAME}.SAFE").path();
         odataArchivePath = odp.root(scihubUrl + "/Products('${UUID}')").value();
@@ -203,11 +206,28 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
         }
     }
 
+    public void copyOptionsFrom(SentinelProductDownloader anotherDownloader) {
+        this.downloadMode = anotherDownloader.downloadMode;
+        this.props = anotherDownloader.props;
+        this.destination = anotherDownloader.destination;
+        this.shouldCompress = anotherDownloader.shouldCompress;
+        this.shouldDeleteAfterCompression = anotherDownloader.shouldDeleteAfterCompression;
+        this.productLogger = anotherDownloader.productLogger;
+        this.batchProgressListener = anotherDownloader.batchProgressListener;
+        this.fileProgressListener = anotherDownloader.fileProgressListener;
+        this.bands = anotherDownloader.bands;
+        this.filteredTiles = anotherDownloader.filteredTiles;
+        this.shouldFilterTiles = anotherDownloader.shouldFilterTiles;
+        this.tileIdPattern = anotherDownloader.tileIdPattern;
+        this.fillMissingAnglesMethod = anotherDownloader.fillMissingAnglesMethod;
+        this.store = anotherDownloader.store;
+    }
+
     @Override
     protected Path download(SentinelProductDescriptor product) throws IOException {
         String tileId = product.getTileIdentifier();
         if (tileId != null && this.filteredTiles != null && !this.filteredTiles.contains(tileId)) {
-            getLogger().warn("The product %s did not contain any tiles from the tile list", product.getName());
+            getLogger().warn("(" + currentProduct + ") The product %s did not contain any tiles from the tile list", product.getName());
             return null;
         }
         switch (store) {
@@ -236,6 +256,12 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
         return url;
     }
 
+    @Override
+    protected boolean isIntendedFor(SentinelProductDescriptor product) {
+        final PlatformType platform = product.getPlatform();
+        return PlatformType.S2A.equals(platform) || PlatformType.S2B.equals(platform);
+    }
+
     private Path downloadFromSciHub(SentinelProductDescriptor productDescriptor) throws IOException {
         Path rootPath = null;
         String url;
@@ -246,14 +272,14 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
             currentStep = "Archive";
             url = odataArchivePath.replace(Constants.ODATA_UUID, productDescriptor.getId());
             rootPath = Paths.get(destination, productName + ".zip");
-            rootPath = downloadFile(url, rootPath, NetUtils.getAuthToken());
+            rootPath = downloadFile(url, rootPath, this.netUtils.getAuthToken());
         }
         if (rootPath == null || !Files.exists(rootPath)) {
             rootPath = Utilities.ensureExists(Paths.get(destination, productName + ".SAFE"));
             url = getMetadataUrl(productDescriptor);
             Path metadataFile = rootPath.resolve(productDescriptor.getMetadataFileName());
             currentStep = "Metadata";
-            downloadFile(url, metadataFile, NetUtils.getAuthToken());
+            downloadFile(url, metadataFile, this.netUtils.getAuthToken());
             if (Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
                 List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + (Constants.PSD_13.equals(productDescriptor.getVersion()) ? "s" : " "));
@@ -304,7 +330,9 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                         Path imgData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_IMG_DATA));
                         Path qiData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_QI_DATA));
                         String metadataName = productDescriptor.getGranuleMetadataFileName(granuleId);
-                        Path tileMetaFile = downloadFile(pathBuilder.root(tileUrl).node(metadataName).value(), tileFolder.resolve(metadataName), NetUtils.getAuthToken());
+                        Path tileMetaFile = downloadFile(pathBuilder.root(tileUrl).node(metadataName).value(),
+                                                         tileFolder.resolve(metadataName),
+                                                         this.netUtils.getAuthToken());
                         if (tileMetaFile != null) {
                             if (Files.exists(tileMetaFile)) {
                                 List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
@@ -316,7 +344,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                                                                  .node(productDescriptor.getBandFileName(granuleId, bandFileName))
                                                                  .value(),
                                                          imgData.resolve(productDescriptor.getBandFileName(granuleId, bandFileName)),
-                                                         NetUtils.getAuthToken());
+                                                         this.netUtils.getAuthToken());
                                         } else {
                                             getLogger().debug("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
                                         }
@@ -332,7 +360,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                                                                      .node(productDescriptor.getBandFileName(granuleId, bandFileName))
                                                                      .value(),
                                                              imgDataRes.resolve(productDescriptor.getBandFileName(granuleId, bandFileName)),
-                                                             NetUtils.getAuthToken());
+                                                             this.netUtils.getAuthToken());
                                             } else {
                                                 getLogger().debug("Band %s skipped", bandFileName.substring(0, bandFileName.indexOf(".")));
                                             }
@@ -353,7 +381,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                                                              .node(maskFileName)
                                                              .value(),
                                                      qiData.resolve(maskFileName),
-                                                     NetUtils.getAuthToken());
+                                                     this.netUtils.getAuthToken());
                                     } else {
                                         getLogger().debug("Mask %s skipped", mfn);
                                     }
@@ -365,7 +393,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                                                              .node(productDescriptor.getBandFileName(granuleId, maskFileName))
                                                              .value(),
                                                      qiData.resolve(productDescriptor.getBandFileName(granuleId, maskFileName)),
-                                                     NetUtils.getAuthToken());
+                                                     this.netUtils.getAuthToken());
                                     }
                                 }
                                 getLogger().info("Tile download completed in %s", Utilities.formatTime(System.currentTimeMillis() - start));
@@ -382,16 +410,16 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                                                           .value();
                         Path dataStrip = Utilities.ensureExists(dataStripFolder.resolve(productDescriptor.getDatastripFolder(dataStripId)));
                         String dataStripFile = productDescriptor.getDatastripMetadataFileName(dataStripId);
-                        downloadFile(dataStripPath, dataStrip.resolve(dataStripFile), NetUtils.getAuthToken());
+                        downloadFile(dataStripPath, dataStrip.resolve(dataStripFile), this.netUtils.getAuthToken());
                     }
                 } else {
                     Files.deleteIfExists(metadataFile);
                     //Files.deleteIfExists(rootPath);
                     rootPath = null;
-                    getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
+                    getLogger().warn("(" + currentProduct + ") The product %s did not contain any tiles from the tile list", productName);
                 }
             } else {
-                getLogger().warn("The product %s was not found in %s data bucket", productName, store);
+                getLogger().warn("(" + currentProduct + ") The product %s was not found in %s data bucket", productName, store);
                 rootPath = null;
             }
         }
@@ -646,7 +674,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
         }
     }
 
-    private class ODataPath {
+    class ODataPath {
         private StringBuilder buffer;
 
         ODataPath() {
