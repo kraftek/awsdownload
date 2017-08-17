@@ -395,7 +395,8 @@ public class Executor {
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getMaxY());
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getY());
             }
-            boolean searchPreOps = commandLine.hasOption(Constants.PARAM_FLAG_PREOPS);
+            boolean searchPreOps = commandLine.hasOption(Constants.PARAM_FLAG_PREOPS) &&
+                    !commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS);
             numPoints = areaOfInterest.getNumPoints();
             if (products.size() == 0 && numPoints > 0) {
                 String searchUrl;

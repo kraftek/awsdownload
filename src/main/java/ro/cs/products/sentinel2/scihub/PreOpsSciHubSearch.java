@@ -15,6 +15,7 @@
  */
 package ro.cs.products.sentinel2.scihub;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -25,19 +26,17 @@ import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.sentinel2.ProductType;
 import ro.cs.products.sentinel2.S2L1CProductDescriptor;
 import ro.cs.products.sentinel2.S2L2AProductDescriptor;
+import ro.cs.products.sentinel2.scihub.json.Product;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.NetUtils;
 
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
 import java.io.IOException;
-import java.io.StringReader;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Class that issues queries to ESA's SciHub for retrieving product names.
@@ -47,7 +46,6 @@ import java.util.Optional;
 public class PreOpsSciHubSearch extends AbstractSearch<ProductType> {
 
     private String filter;
-    //private CredentialsProvider credsProvider;
 
     public PreOpsSciHubSearch(String url, ProductType type) throws URISyntaxException {
         super(url);
@@ -149,26 +147,27 @@ public class PreOpsSciHubSearch extends AbstractSearch<ProductType> {
         try (CloseableHttpResponse response = NetUtils.openConnection(queryUrl, credentials)) {
             switch (response.getStatusLine().getStatusCode()) {
                 case 200:
-                    final JsonReader reader = Json.createReader(new StringReader(EntityUtils.toString(response.getEntity())));
-                    JsonArray readArray = reader.readArray();
-                    ProductDescriptor currentProduct = null;
-                    double currentClouds;
-                    for (int i = 0; i < readArray.size(); i++) {
-                        JsonObject jsonProduct = readArray.getJsonObject(i);
-                        currentProduct = (this.productType == null || ProductType.S2MSI1C.equals(this.productType)) ?
-                                    new S2L1CProductDescriptor() : new S2L2AProductDescriptor();
-                        currentProduct.setName(jsonProduct.getString("identifier"));
-                        currentProduct.setId(jsonProduct.getString("uuid"));
-                        currentClouds = Double.parseDouble(jsonProduct.getJsonArray("indexes").getJsonObject(0)
-                                                                   .getJsonArray("children").getJsonObject(0)
-                                                                   .getString("value"));
-                        if (cloudFilter == 0 || currentClouds <= cloudFilter) {
-                            currentProduct.setCloudsPercentage(currentClouds);
-                            results.add(currentProduct);
-                        } else {
-                            Logger.getRootLogger().info("%s skipped [clouds: %s]", currentProduct, currentClouds);
-                        }
-                    }
+                    ObjectMapper mapper = new ObjectMapper();
+                    Product[] products = mapper.readValue(EntityUtils.toString(response.getEntity()), Product[].class);
+                    results.addAll(Arrays.stream(products).filter(
+                            p -> p.getIndexes().stream().anyMatch(
+                                    i -> i.getChildren().stream().anyMatch(
+                                            c -> "Cloud cover percentage".equals(c.getName()) &&
+                                                    (cloudFilter == 0 || Double.parseDouble(c.getValue()) <= cloudFilter))))
+                            .map(p-> ((this.productType == null) || ProductType.S2MSI1C.equals(this.productType)) ?
+                                    new S2L1CProductDescriptor() {{
+                                        setName(p.getIdentifier());
+                                        setId(p.getUuid());
+                                        setCloudsPercentage(
+                                                p.getIndexes().stream().mapToDouble(
+                                                        i -> Double.parseDouble(i.getChildren().stream().filter(
+                                                                c -> "Cloud cover percentage".equals(c.getName())
+                                                        ).findFirst().get().getValue())
+                                                ).findFirst().getAsDouble()
+                                        );
+                                    }}
+                                    : new S2L2AProductDescriptor() {
+                            }).collect(Collectors.toList()));
                     break;
                 case 401:
                     Logger.getRootLogger().info("The supplied credentials are invalid!");
