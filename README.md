@@ -1,6 +1,7 @@
 # Purpose
-This is a simple downloader for either Sentinel-2 or Landsat-8.
-Sentinel-2 products can be downloaded from either Amazon Web Services (AWS) or ESA's SciHub.
+This is a simple downloader for either Sentinel-2 (A and B) or Landsat-8.
+Sentinel-2A products can be downloaded from either Amazon Web Services (AWS) or ESA's SciHub.
+Sentinel-2B products can be downloaded from either Amazon Web Services (AWS) or ESA's Pre-Operational Hub.
 Landsat-8 products are downloaded from Amazon Web Services.
 The initial reason of creating this downloader: AWS stores the elements of an S2 product (granules, metadata files) in a way
 different from the official SAFE format. Therefore, if you want to use it with tools like Sentinel-2 Toolbox 
@@ -13,7 +14,9 @@ a tile list on the command line, or by putting tiles in a dedicated file which i
 supplied either as a list of comma-separated pairs of coordinates as argument, or in a file given as argument.
 3. Can download products / tiles given a list of products.
 4. Can download only products / tiles whose cloud coverage is below a given threshold.
-5. Can download tiles by only giving the tile list.
+5. Can download tiles by only giving the tile list (a tile identifier for Landsat 8 is composed of path+row)
+6. Can perform search only (i.e. without downloading the products).
+7. If used in conjunction with a local product mirror, can either copy or create symbolic links of products, instead of downloading them.
 
 Filtering on products is mutually exclusive with filtering on an area of interest. The AOI is used to query SciHub for products intersecting it, optionally by supplying the start and end of sensing times. If the AOI is a polygon which has more than 200 points, the extent (bounding box) of this polygon will be used instead.
 
