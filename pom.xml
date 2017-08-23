@@ -6,7 +6,7 @@
 
     <groupId>ro.cs.products</groupId>
     <artifactId>ProductDownload</artifactId>
-    <version>1.6</version>
+    <version>1.7</version>
     <packaging>jar</packaging>
 
     <name>Sentinel2 and Landsat8 products downloader</name>
@@ -64,6 +64,12 @@
             <artifactId>jackson-databind</artifactId>
             <version>LATEST</version>
         </dependency>
+        <!-- Junit tests -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -90,6 +96,7 @@
                             <mainClass>ro.cs.products.Executor</mainClass>
                         </manifest>
                     </archive>
+                    <jarName>${project.artifactId}-${project.version}</jarName>
                 </configuration>
             </plugin>
             <plugin>

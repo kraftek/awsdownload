@@ -27,6 +27,12 @@ public class S2L2AProductDescriptor extends SentinelProductDescriptor {
     }
 
     @Override
+    public String getSensingDate() {
+        String[] tokens = getTokens(ProductV14, this.name, null);
+        return tokens[2].substring(0, 8);
+    }
+
+    @Override
     public String getVersion() {
         if (this.version == null) {
             this.version = Constants.PSD_14;;

@@ -17,6 +17,7 @@ package ro.cs.products;
 
 import ro.cs.products.base.DownloadMode;
 import ro.cs.products.base.ProductDescriptor;
+import ro.cs.products.sentinel2.ProductStore;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.NetUtils;
 import ro.cs.products.util.ReturnCode;
@@ -29,10 +30,14 @@ import java.io.InterruptedIOException;
 import java.net.HttpURLConnection;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -63,6 +68,7 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
     protected boolean shouldCompress;
     protected boolean shouldDeleteAfterCompression;
     protected DownloadMode downloadMode;
+    protected ProductStore store;
 
     protected Logger.ScopeLogger productLogger;
 
@@ -95,6 +101,12 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
         Collections.addAll(this.bands, bands);
     }
 
+    public void setDownloadStore(ProductStore store) {
+        this.store = store;
+    }
+
+    public void overrideBaseUrl(String newValue) { this.baseUrl = newValue; }
+
     void setDownloadMode(DownloadMode mode) {
         this.downloadMode = mode;
     }
@@ -109,19 +121,34 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
                 currentProduct = "Product " + String.valueOf(productCounter++) + "/" + String.valueOf(productCount);
                 try {
                     Utilities.ensureExists(Paths.get(destination));
-                    file = download(product);
-                    if (file == null) {
-                        if (this.additionalDownloader != null && this.additionalDownloader.isIntendedFor(product)) {
-                            file = this.additionalDownloader.download(product);
+                    switch (this.store) {
+                        case LOCAL:
+                            file = DownloadMode.COPY.equals(this.downloadMode) ?
+                                    copy(product, Paths.get(baseUrl), Paths.get(destination)) :
+                                    link(product, Paths.get(baseUrl), Paths.get(destination));
                             if (file == null) {
                                 retCode = ReturnCode.EMPTY_PRODUCT;
+                                getLogger().warn("(" + currentProduct + ") Product copy or link failed");
                             }
-                        } else {
-                            retCode = ReturnCode.EMPTY_PRODUCT;
-                        }
-                        if (retCode == ReturnCode.EMPTY_PRODUCT) {
-                            getLogger().warn("(" + currentProduct + ") Product download aborted");
-                        }
+                            break;
+                        case SCIHUB:
+                        case AWS:
+                        default:
+                            file = download(product);
+                            if (file == null) {
+                                if (this.additionalDownloader != null && this.additionalDownloader.isIntendedFor(product)) {
+                                    file = this.additionalDownloader.download(product);
+                                    if (file == null) {
+                                        retCode = ReturnCode.EMPTY_PRODUCT;
+                                    }
+                                } else {
+                                    retCode = ReturnCode.EMPTY_PRODUCT;
+                                }
+                                if (retCode == ReturnCode.EMPTY_PRODUCT) {
+                                    getLogger().warn("(" + currentProduct + ") Product download aborted");
+                                }
+                            }
+                            break;
                     }
                 } catch (IOException ignored) {
                     getLogger().warn("(" + currentProduct + ") IO Exception: " + ignored.getMessage());
@@ -164,6 +191,73 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
     protected abstract Path download(T product) throws IOException;
 
     protected abstract boolean isIntendedFor(T product);
+
+    protected Path findProductPath(Path root, T product) {
+        // Products are assumed to be organized by year (yyyy), month (MM) and day (dd)
+        // If it's not the case, this method should be overridden
+        String date = product.getSensingDate();
+        Path productPath = root.resolve(date.substring(0, 4));
+        if (Files.exists(productPath)) {
+            productPath = productPath.resolve(date.substring(4, 6));
+            productPath = Files.exists(productPath) ?
+                    productPath.resolve(date.substring(6, 8)).resolve(product.getName()) :
+                    null;
+            if (productPath != null && !Files.exists(productPath)) {
+                productPath = null;
+            }
+        } else {
+            productPath = null;
+        }
+        return productPath;
+    }
+
+    protected Path copy(T product, Path sourceRoot, Path targetRoot) throws IOException {
+        Path sourcePath = findProductPath(sourceRoot, product);
+        if (sourcePath == null) {
+            getLogger().warn("Product %s not found in the local archive", product.getName());
+            return null;
+        }
+        Path destinationPath = targetRoot.resolve(sourcePath.getFileName());
+        if (Files.isDirectory(sourcePath)) {
+            if (!Files.exists(destinationPath)) {
+                Files.createDirectory(destinationPath);
+            }
+            Files.walkFileTree(sourcePath, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    Path target = destinationPath.resolve(sourcePath.relativize(dir));
+                    if (!Files.exists(target)) {
+                        Files.createDirectory(target);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    Files.copy(file,
+                               destinationPath.resolve(sourcePath.relativize(file)),
+                               StandardCopyOption.REPLACE_EXISTING);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } else {
+            Files.copy(sourcePath, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return destinationPath;
+    }
+
+    protected Path link(T product, Path sourceRoot, Path targetRoot) throws IOException {
+        Path sourcePath = findProductPath(sourceRoot, product);
+        if (sourcePath == null) {
+            getLogger().warn("Product %s not found in the local archive", product.getName());
+        }
+        Path destinationPath = sourcePath != null ? targetRoot.resolve(sourcePath.getFileName()) : null;
+        if (destinationPath != null && !Files.exists(destinationPath)) {
+            return Files.createSymbolicLink(destinationPath, sourcePath);
+        } else {
+            return destinationPath;
+        }
+    }
 
     protected Path downloadFile(String remoteUrl, Path file) throws IOException {
         return downloadFile(remoteUrl, file, null);

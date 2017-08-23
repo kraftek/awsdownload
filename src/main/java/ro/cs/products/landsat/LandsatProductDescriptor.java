@@ -19,6 +19,7 @@ import ro.cs.products.ProductDownloader;
 import ro.cs.products.base.ProductDescriptor;
 import ro.cs.products.util.Constants;
 
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.Year;
 import java.time.ZoneId;
@@ -57,6 +58,11 @@ public class LandsatProductDescriptor extends ProductDescriptor {
             this.version = this.oldFormat ? Constants.L8_PRECOLL : Constants.L8_COLL;
         }
         return this.version;
+    }
+
+    @Override
+    public String getSensingDate() {
+        return new SimpleDateFormat("yyyyMMdd").format(getAcquisitionDate().getTime());
     }
 
     public CollectionCategory getProductType() {

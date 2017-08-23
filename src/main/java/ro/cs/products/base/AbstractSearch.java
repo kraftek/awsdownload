@@ -41,6 +41,7 @@ public abstract class AbstractSearch<T extends Object> {
     protected AbstractSearch<T> additionalProvider;
     protected List<NameValuePair> params;
     protected UsernamePasswordCredentials credentials;
+    protected String filter;
 
     public AbstractSearch(String url) throws URISyntaxException {
         this.url = new URI(url);
@@ -61,6 +62,7 @@ public abstract class AbstractSearch<T extends Object> {
         this.tiles = anotherSearch.tiles;
         this.productType = anotherSearch.productType;
         this.params = anotherSearch.params;
+        this.filter = anotherSearch.filter;
     }
 
     public void setSensingStart(String sensingStart) {

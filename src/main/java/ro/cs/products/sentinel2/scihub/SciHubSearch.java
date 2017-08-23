@@ -39,8 +39,6 @@ import java.util.List;
  */
 public class SciHubSearch extends AbstractSearch<ProductType> {
 
-    protected String filter;
-
     public SciHubSearch(String url, ProductType type) throws URISyntaxException {
         super(url);
         this.productType = type;

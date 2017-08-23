@@ -45,8 +45,6 @@ import java.util.stream.Collectors;
  */
 public class PreOpsSciHubSearch extends AbstractSearch<ProductType> {
 
-    private String filter;
-
     public PreOpsSciHubSearch(String url, ProductType type) throws URISyntaxException {
         super(url);
         this.productType = type;

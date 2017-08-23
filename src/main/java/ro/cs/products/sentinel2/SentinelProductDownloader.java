@@ -134,8 +134,6 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
     Pattern tileIdPattern;
     FillAnglesMethod fillMissingAnglesMethod;
 
-    ProductStore store;
-
     Logger.ScopeLogger productLogger;
 
     public SentinelProductDownloader(ProductStore source, String targetFolder, Properties properties, NetUtils netUtils) {
@@ -165,10 +163,6 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
         odataTilePath = odp.path();
         odataMetadataPath = odp.root(odataProductPath).node(Constants.ODATA_XML_PLACEHOLDER).value();
         fillMissingAnglesMethod = FillAnglesMethod.NONE;
-    }
-
-    public void setDownloadStore(ProductStore store) {
-        this.store = store;
     }
 
     public void setFilteredTiles(Set<String> tiles, boolean unpacked) {
@@ -260,6 +254,15 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
     protected boolean isIntendedFor(SentinelProductDescriptor product) {
         final PlatformType platform = product.getPlatform();
         return PlatformType.S2A.equals(platform) || PlatformType.S2B.equals(platform);
+    }
+
+    @Override
+    protected Path findProductPath(Path root, SentinelProductDescriptor product) {
+        String name = product.getName();
+        if (!name.endsWith(".SAFE")) {
+            product.setName(name + ".SAFE");
+        }
+        return super.findProductPath(root, product);
     }
 
     private Path downloadFromSciHub(SentinelProductDescriptor productDescriptor) throws IOException {

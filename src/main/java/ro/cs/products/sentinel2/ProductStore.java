@@ -28,5 +28,9 @@ public enum ProductStore {
     /*
      * Copernicus Science Hub
      */
-    SCIHUB
+    SCIHUB,
+    /*
+     * File system
+     */
+    LOCAL
 }

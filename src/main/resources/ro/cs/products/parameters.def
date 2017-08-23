@@ -1,23 +1,23 @@
 # Group identifier (n/a if independent) ; Short code ; Long code ; Args cardinality ; Value hint ; Value separator (if multiple) ; Optional ; Description
 
 # Common command line arguments
-1 ; o ; out ; 1 ; output folder ; ; false ; The folder in which the products will be downloaded
-1 ; i ; input ; 1 ; input folder ; ; false ; The folder in which the products are to be inspected
-2 ; a ; area ; n ; lon1,lat1 lon2,lat2 ... ; ' ' ; true ; A closed polygon whose vertices are given in <lon,lat> pairs, space-separated
-2 ; af ; areafile ; 1 ; file path and name ; ; true ; The file containing a closed polygon whose vertices are given in <lon lat> pairs, comma-separated
-2 ; ts ; shapetiles ; 1 ; file path and name ; ; true ; The KML file containing Sentinel-2 tile extents
-3 ; t ; tiles ; n ; tileId1 tileId2 ... ; ' ' ; true ; A list of S2 tile IDs, space-separated
-3 ; tf ; tilefile ; 1 ; file path and name ; ; true ; A file containing a list of S2 tile IDs, one tile id per line
-4 ; p ; products ; n ; product1 product2 ... ; ' ' ; true ; A list of S2/L8 product names, space-separated
-4 ; pf ; productfile ; 1 ; file path and name ; ; true ; A file containing a list of S2/L8 products, one product name per line
+n/a ; o ; out ; 1 ; output folder ; ; false ; The folder in which the products will be downloaded
+n/a ; i ; input ; 1 ; input folder ; ; false ; The folder in which the products are to be inspected
+1 ; a ; area ; n ; lon1,lat1 lon2,lat2 ... ; ' ' ; true ; A closed polygon whose vertices are given in <lon,lat> pairs, space-separated
+1 ; af ; areafile ; 1 ; file path and name ; ; true ; The file containing a closed polygon whose vertices are given in <lon lat> pairs, comma-separated
+1 ; ts ; shapetiles ; 1 ; file path and name ; ; true ; The KML file containing Sentinel-2 tile extents
+2 ; t ; tiles ; n ; tileId1 tileId2 ... ; ' ' ; true ; A list of S2 tile IDs, space-separated
+2 ; tf ; tilefile ; 1 ; file path and name ; ; true ; A file containing a list of S2 tile IDs, one tile id per line
+3 ; p ; products ; n ; product1 product2 ... ; ' ' ; true ; A list of S2/L8 product names, space-separated
+3 ; pf ; productfile ; 1 ; file path and name ; ; true ; A file containing a list of S2/L8 products, one product name per line
 n/a ; b ; bands ; n ; band1 band2 ... ; ' ' ; true ; The list of S2/L8 band names, space-separated, to be downloaded. If not specified, all bands are downloaded
 n/a ; start ; startdate ; 1 ; yyyy-MM-dd ; ; true ; Look for products from a specific date (formatted as yyyy-MM-dd). Default is current date -7 days
 n/a ; end ; enddate ; 1 ; yyyy-MM-dd ; ; true ; Look for products up to (and including) a specific date (formatted as yyyy-MM-dd). Default is current date
 n/a ; l ; limit ; 1 ; integer greater than 1 ; ; true ; The maximum number of products returned. Default is 10
-n/a ; s ; store ; 1 ; AWS|SCIHUB ; ; true ; Store of products being downloaded. Supported values are AWS or SCIHUB. Default is SCIHUB
+n/a ; s ; store ; 1 ; AWS|SCIHUB|LOCAL ; ; true ; Store of products being downloaded. Supported values are AWS or SCIHUB. Default is SCIHUB
 n/a ; sen ; sensor ; 1 ; S2|L8 ; ; true ; The sensor (product) type. Supported values are S2 or L8. Default is S2
 n/a ; cp ; cloudpercentage; 1 ; number between 0 and 100 ; ; true ; The threshold for cloud coverage of the products. Above this threshold, the products will be ignored. Default is 100
-n/a ; r ; resume ; 0 ; ; ; true ; Resume incomplete downloads
+n/a ; m ; mode ; 1 ; OVERWRITE|RESUME|COPY|SYMLINK ; ; true ; The mode of fetching or downloading products. Default is OVERWRITE
 n/a ; z ; zip ; 0 ; ; ; true ; Compress the product into a zip archive
 n/a ; d ; delete ; 0 ; ; ; true ; Delete the product files after compression
 n/a ; v ; verbose ; 0 ; ; ; true ; Produce verbose output/logs

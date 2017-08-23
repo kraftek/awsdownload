@@ -170,24 +170,18 @@ public class Executor {
         int retCode = ReturnCode.OK;
         String logFile = props.getProperty("master.log.file");
         String folder;
-        boolean debugMode = commandLine.hasOption(Constants.PARAM_VERBOSE);
-        boolean searchMode = commandLine.hasOption(Constants.PARAM_SEARCH_ONLY);
+        boolean debugMode = getArgValue(commandLine, Constants.PARAM_VERBOSE, Boolean.class, false);
+        boolean searchMode = getArgValue(commandLine, Constants.PARAM_SEARCH_ONLY, Boolean.class, false);
         Logger.CustomLogger logger;
-        SensorType sensorType = commandLine.hasOption(Constants.PARAM_SENSOR) ?
-                Enum.valueOf(SensorType.class, commandLine.getOptionValue(Constants.PARAM_SENSOR)) :
-                SensorType.S2;
-        ProductType productType = commandLine.hasOption(Constants.PARAM_S2_PRODUCT_TYPE) ?
-                Enum.valueOf(ProductType.class, commandLine.getOptionValue(Constants.PARAM_S2_PRODUCT_TYPE)) :
-                ProductType.S2MSI1C;
-        DownloadMode downloadMode = commandLine.hasOption(Constants.PARAM_FLAG_RESUME) ?
-                DownloadMode.RESUME : DownloadMode.OVERWRITE;
+        SensorType sensorType = getArgValue(commandLine, Constants.PARAM_SENSOR, SensorType.class, SensorType.S2);
+        ProductType productType = getArgValue(commandLine, Constants.PARAM_S2_PRODUCT_TYPE, ProductType.class, ProductType.S2MSI1C);
+        DownloadMode downloadMode = getArgValue(commandLine, Constants.PARAM_DOWNLOAD_MODE, DownloadMode.class, DownloadMode.OVERWRITE);
         LandsatCollection l8collection = null;
         if (sensorType == SensorType.L8) {
-            l8collection = commandLine.hasOption(Constants.PARAM_L8_COLLECTION) ?
-                    Enum.valueOf(LandsatCollection.class, commandLine.getOptionValue(Constants.PARAM_L8_COLLECTION)) :
-                    LandsatCollection.C1;
+            l8collection = getArgValue(commandLine, Constants.PARAM_L8_COLLECTION, LandsatCollection.class, LandsatCollection.C1);
         }
-        if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER)) {
+        if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER) &&
+                (downloadMode != DownloadMode.COPY && downloadMode != DownloadMode.SYMLINK)) {
             folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));
             Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString(), debugMode);
@@ -231,28 +225,23 @@ public class Executor {
             logger = Logger.getRootLogger();
             printCommandLine(commandLine);
 
-            String proxyType = commandLine.hasOption(Constants.PARAM_PROXY_TYPE) ?
-                    commandLine.getOptionValue(Constants.PARAM_PROXY_TYPE) :
-                    nullIfEmpty(props.getProperty("proxy.type", null));
-            String proxyHost = commandLine.hasOption(Constants.PARAM_PROXY_HOST) ?
-                    commandLine.getOptionValue(Constants.PARAM_PROXY_HOST) :
-                    nullIfEmpty(props.getProperty("proxy.host", null));
-            String proxyPort = commandLine.hasOption(Constants.PARAM_PROXY_PORT) ?
-                    commandLine.getOptionValue(Constants.PARAM_PROXY_PORT) :
-                    nullIfEmpty(props.getProperty("proxy.port", null));
-            String proxyUser = commandLine.hasOption(Constants.PARAM_PROXY_USER) ?
-                    commandLine.getOptionValue(Constants.PARAM_PROXY_USER) :
-                    nullIfEmpty(props.getProperty("proxy.user", null));
-            String proxyPwd = commandLine.hasOption(Constants.PARAM_PROXY_PASSWORD) ?
-                    commandLine.getOptionValue(Constants.PARAM_PROXY_PASSWORD) :
-                    nullIfEmpty(props.getProperty("proxy.pwd", null));
+            String proxyType = getArgValue(commandLine, Constants.PARAM_PROXY_TYPE, String.class,
+                                           nullIfEmpty(props.getProperty("proxy.type", null)));
+            String proxyHost = getArgValue(commandLine, Constants.PARAM_PROXY_HOST, String.class,
+                                           nullIfEmpty(props.getProperty("proxy.host", null)));
+            String proxyPort = getArgValue(commandLine, Constants.PARAM_PROXY_PORT, String.class,
+                                           nullIfEmpty(props.getProperty("proxy.port", null)));
+            String proxyUser = getArgValue(commandLine, Constants.PARAM_PROXY_USER, String.class,
+                                           nullIfEmpty(props.getProperty("proxy.user", null)));
+            String proxyPwd = getArgValue(commandLine, Constants.PARAM_PROXY_PASSWORD, String.class,
+                                          nullIfEmpty(props.getProperty("proxy.pwd", null)));
             NetUtils.setProxy(proxyType, proxyHost, proxyPort == null ? 0 : Integer.parseInt(proxyPort), proxyUser, proxyPwd);
 
             List<ProductDescriptor> products = new ArrayList<>();
             Set<String> tiles = new HashSet<>();
             Polygon2D areaOfInterest = new Polygon2D();
 
-            ProductStore source = Enum.valueOf(ProductStore.class, commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE, ProductStore.SCIHUB.toString()));
+            ProductStore source = getArgValue(commandLine, Constants.PARAM_DOWNLOAD_STORE, ProductStore.class, ProductStore.SCIHUB);
 
             if (sensorType == SensorType.S2 && !commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS) && !commandLine.hasOption(Constants.PARAM_USER)) {
                 throw new MissingOptionException("Missing SciHub credentials");
@@ -271,6 +260,10 @@ public class Executor {
                                                   props, sciHubNetUtils) :
                     new LandsatProductDownloader(commandLine.getOptionValue(Constants.PARAM_OUT_FOLDER), props);
             downloader.setDownloadMode(downloadMode);
+            String archive = getArgValue(commandLine, Constants.PARAM_INPUT_FOLDER, String.class, null);
+            if (archive != null) {
+                downloader.overrideBaseUrl(archive);
+            }
             TileMap tileMap = sensorType == SensorType.S2 ?
                     SentinelTilesMap.getInstance() :
                     LandsatTilesMap.getInstance();
@@ -329,12 +322,7 @@ public class Executor {
                 }
             }
 
-            double clouds;
-            if (commandLine.hasOption(Constants.PARAM_CLOUD_PERCENTAGE)) {
-                clouds = Double.parseDouble(commandLine.getOptionValue(Constants.PARAM_CLOUD_PERCENTAGE));
-            } else {
-                clouds = Constants.DEFAULT_CLOUD_PERCENTAGE;
-            }
+            double clouds = getArgValue(commandLine, Constants.PARAM_CLOUD_PERCENTAGE, Double.class, Constants.DEFAULT_CLOUD_PERCENTAGE);
             String sensingStart;
             if (commandLine.hasOption(Constants.PARAM_START_DATE)) {
                 String dateString = commandLine.getOptionValue(Constants.PARAM_START_DATE);
@@ -355,21 +343,12 @@ public class Executor {
                 sensingEnd = Constants.DEFAULT_END_DATE;
             }
 
-            int limit;
-            if (commandLine.hasOption(Constants.PARAM_RESULTS_LIMIT)) {
-                limit = Integer.parseInt(commandLine.getOptionValue(Constants.PARAM_RESULTS_LIMIT));
-            } else {
-                limit = Constants.DEFAULT_RESULTS_LIMIT;
-            }
+            int limit = getArgValue(commandLine, Constants.PARAM_RESULTS_LIMIT, Integer.class, Constants.DEFAULT_RESULTS_LIMIT);
 
-            if (commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE)) {
-                String value = commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE);
-                if (downloader instanceof SentinelProductDownloader) {
-                    ((SentinelProductDownloader) downloader).setDownloadStore(Enum.valueOf(ProductStore.class, value));
-                    logger.info("Products will be downloaded from %s", value);
-                } else {
-                    logger.warn("Argument --store will be ignored for Landsat8");
-                }
+            ProductStore store = getArgValue(commandLine, Constants.PARAM_DOWNLOAD_STORE, ProductStore.class, ProductStore.SCIHUB);
+            downloader.setDownloadStore(store);
+            if (!searchMode) {
+                logger.info("Download will be attempted from %s", store);
             }
 
             downloader.shouldCompress(commandLine.hasOption(Constants.PARAM_FLAG_COMPRESS));
@@ -395,15 +374,15 @@ public class Executor {
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getMaxY());
                 areaOfInterest.append(rectangle2D.getX(), rectangle2D.getY());
             }
-            boolean searchPreOps = commandLine.hasOption(Constants.PARAM_FLAG_PREOPS) &&
-                    !commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS);
+            boolean searchPreOps = getArgValue(commandLine, Constants.PARAM_FLAG_PREOPS, Boolean.class, false);
+            searchPreOps &= !commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS);
             numPoints = areaOfInterest.getNumPoints();
             if (products.size() == 0 && numPoints > 0) {
                 String searchUrl;
                 AbstractSearch searchProvider;
                 logger.debug("No product provided, searching on the AOI");
                 if (sensorType == SensorType.L8) {
-                    logger.debug("Search will be done for Landsat");
+                    logger.info("Search will be attempted on AWS");
                     searchUrl = l8collection != null && l8collection.equals(LandsatCollection.C1) ?
                             props.getProperty(Constants.PROPERTY_NAME_LANDSAT_AWS_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL) :
                             props.getProperty(Constants.PROPERTY_NAME_LANDSAT_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL);
@@ -426,7 +405,7 @@ public class Executor {
                                                                    commandLine.getOptionValue(Constants.PARAM_L8_PRODUCT_TYPE)));
                     }
                 } else if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS)) {
-                    logger.debug("Search will be done on SciHub");
+                    logger.info("Search will be attempted on SciHub");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
                     if (!sciHubNetUtils.isAvailable(searchUrl)) {
                         logger.warn(searchUrl + " is not available!");
@@ -444,7 +423,7 @@ public class Executor {
                         search.filter(Constants.SEARCH_PARAM_RELATIVE_ORBIT_NUMBER, commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT));
                     }
                 } else {
-                    logger.debug("Search will be done on AWS");
+                    logger.info("Search will be attempted on AWS");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_AWS_SEARCH_URL, Constants.PROPERTY_DEFAULT_AWS_SEARCH_URL);
                     searchProvider = new AmazonSearch(searchUrl);
                     searchProvider.setTiles(tiles);
@@ -539,5 +518,34 @@ public class Executor {
 
     private static String nullIfEmpty(String string) {
         return string != null ? (string.isEmpty() ? null : string) : null;
+    }
+
+    private static <T> T getArgValue(CommandLine cmd, String argName, Class<T> clazz, T defaultValue) {
+        if (!cmd.hasOption(argName)) {
+            return defaultValue;
+        } else {
+            final String optionValue = cmd.getOptionValue(argName);
+            if (Boolean.class.isAssignableFrom(clazz)) {
+                return clazz.cast(true);
+            } else if (Integer.class.isAssignableFrom(clazz)){
+                return clazz.cast(Integer.parseInt(optionValue));
+            } else if (Double.class.isAssignableFrom(clazz)) {
+                return clazz.cast(Double.parseDouble(optionValue));
+            } else {
+                return clazz.cast(optionValue);
+            }
+        }
+    }
+
+    private static <T extends Enum<T>> T getArgValue(CommandLine cmd, String argName, Class<T> clazz, T defaultValue) {
+        if (!cmd.hasOption(argName)) {
+            return defaultValue;
+        } else {
+            return Enum.valueOf(clazz, cmd.getOptionValue(argName));
+        }
+    }
+
+    private static String[] getArgValues(CommandLine cmd, String argName) {
+        return cmd.hasOption(argName) ? cmd.getOptionValues(argName) : null;
     }
 }
