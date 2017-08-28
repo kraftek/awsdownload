@@ -1,7 +1,7 @@
 <assembly>
-    <id>bin</id>
+    <id>${project.version}</id>
     <formats>
-        <format>dir</format>
+        <format>zip</format>
     </formats>
 
     <dependencySets>

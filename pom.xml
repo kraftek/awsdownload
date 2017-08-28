@@ -9,7 +9,7 @@
     <version>1.7</version>
     <packaging>jar</packaging>
 
-    <name>Sentinel2 and Landsat8 products downloader</name>
+    <name>Sentinel2 and Landsat8 Products Downloader</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -96,7 +96,7 @@
                             <mainClass>ro.cs.products.Executor</mainClass>
                         </manifest>
                     </archive>
-                    <jarName>${project.artifactId}-${project.version}</jarName>
+                    <jarName>${project.artifactId}</jarName>
                 </configuration>
             </plugin>
             <plugin>
