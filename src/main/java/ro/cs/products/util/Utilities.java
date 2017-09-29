@@ -18,20 +18,25 @@
  */
 package ro.cs.products.util;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * Utility class for various operations.
@@ -143,6 +148,28 @@ public class Utilities {
             Logger.getRootLogger().warn("Cannot set permissions for %s", file.toString());
         }
         return file;
+    }
+
+    public static List<Path> listFolders(Path root) throws IOException {
+        final List<Path> folders = new ArrayList<>();
+        Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                folders.add(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return folders;
+    }
+
+    public static List<Path> listFiles(Path folder) throws IOException {
+        final File[] files = folder.toFile().listFiles();
+        return files != null ?
+                Arrays.stream(files)
+                      .filter(File::isFile)
+                      .map(File::toPath)
+                      .collect(Collectors.toList()) :
+                null;
     }
 
     private static boolean isPosixFileSystem() {

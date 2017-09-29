@@ -100,21 +100,38 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
 
     void setFileProgressListener(ProgressListener listener) { this.fileProgressListener = listener; }
 
+    /**
+     * Sets the list of bands to filter for
+     * @param bands     The band identifiers
+     */
     public void setBandList(String[] bands) {
         this.bands = new HashSet<>();
         Collections.addAll(this.bands, bands);
     }
 
+    /**
+     * Sets the store from where to download
+     */
     public void setDownloadStore(ProductStore store) {
         this.store = store;
     }
 
+    /**
+     * Sets the new value for the base url of the remote products
+     */
     public void overrideBaseUrl(String newValue) { this.baseUrl = newValue; }
 
+    /**
+     * Sets the download mode
+     */
     void setDownloadMode(DownloadMode mode) {
         this.downloadMode = mode;
     }
 
+    /**
+     * Downloads a list of products given their descriptors
+     * @param products      The list of product descriptors
+     */
     int downloadProducts(List<T> products) {
         int retCode = ReturnCode.OK;
         if (products != null) {
@@ -127,9 +144,17 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
                     Utilities.ensureExists(Paths.get(destination));
                     switch (this.store) {
                         case LOCAL:
-                            file = DownloadMode.COPY.equals(this.downloadMode) ?
-                                    copy(product, Paths.get(baseUrl), Paths.get(destination)) :
-                                    link(product, Paths.get(baseUrl), Paths.get(destination));
+                            switch (this.downloadMode) {
+                                case COPY:
+                                    file = copy(product, Paths.get(baseUrl), Paths.get(destination));
+                                    break;
+                                case SYMLINK:
+                                    file = link(product, Paths.get(baseUrl), Paths.get(destination));
+                                    break;
+                                case FILTERED_SYMLINK:
+                                    file = link(product);
+                                    break;
+                            }
                             if (file == null) {
                                 retCode = ReturnCode.EMPTY_PRODUCT;
                                 getLogger().warn("(" + currentProduct + ") Product copy or link failed");
@@ -180,22 +205,50 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
         return retCode;
     }
 
+    /**
+     * Instructs the downloader to compress a product when completed
+     */
     void shouldCompress(boolean shouldCompress) {
         this.shouldCompress = shouldCompress;
     }
 
+    /**
+     * Instructs the downloader to delete the product files after it has been compressed
+     */
     void shouldDeleteAfterCompression(boolean shouldDeleteAfterCompression) {
         this.shouldDeleteAfterCompression = shouldDeleteAfterCompression;
     }
 
+    /**
+     * Returns the URL, as a string, of the given product
+     */
     protected abstract String getProductUrl(T descriptor);
-
+    /**
+     * Returns the URL, as a string, of the metadata file for the given product
+     */
     protected abstract String getMetadataUrl(T descriptor);
-
+    /**
+     * Downloads the product and returns the path to the download location, if succeded, or <code>null</code> if failed
+     */
     protected abstract Path download(T product) throws IOException;
+    /**
+     * Creates a symbolic link for the given product and returns the link if succeeded, or <code>null</code> if failed.
+     * The default behavior (of always returning null) should be overridden by implementors.
+     */
+    protected Path link(T product) throws IOException { return null; }
 
+    /**
+     * Checks if this downloader is able to download products of the given type.
+     * @param product   The product descriptor
+     */
     protected abstract boolean isIntendedFor(T product);
 
+    /**
+     * Returns the path of the given product, in the case of local archives.
+     * The archive is assumed to be organized by year, month and day
+     * @param root      The root folder for the local archive
+     * @param product   The product descriptor
+     */
     protected Path findProductPath(Path root, T product) {
         // Products are assumed to be organized by year (yyyy), month (MM) and day (dd)
         // If it's not the case, this method should be overridden
@@ -261,6 +314,14 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
         } else {
             return destinationPath;
         }
+    }
+
+    protected Path copyFile(Path sourcePath, Path file) throws IOException {
+        return Files.exists(file) ? file : Files.copy(sourcePath, file);
+    }
+
+    protected Path linkFile(Path sourcePath, Path file) throws IOException {
+        return Files.exists(file) ? file : Files.createSymbolicLink(file, sourcePath);
     }
 
     protected Path downloadFile(String remoteUrl, Path file) throws IOException {

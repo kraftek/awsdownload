@@ -16,24 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package ro.cs.products.sentinel2.workaround;
+
+package ro.cs.products.sentinel2.peps;
 
 /**
- * Types of operation supported for treating the angles grids.
- *
  * @author Cosmin Cara
  */
-public enum FillAnglesMethod {
-    /*
-     * Nothing to do
-     */
-    NONE,
-    /*
-     * Missing angle value replaced with NaN
-     */
-    NAN,
-    /*
-     * Missing angle value interpolated from existing values
-     */
-    INTERPOLATE
+public enum  PepsCollection {
+    S1,
+    S2,
+    S2ST,
+    S3
 }

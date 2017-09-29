@@ -19,8 +19,8 @@
 package ro.cs.products.sentinel2;
 
 import ro.cs.products.ProductDownloader;
-import ro.cs.products.sentinel2.workaround.FillAnglesMethod;
-import ro.cs.products.sentinel2.workaround.MetadataRepairer;
+import ro.cs.products.sentinel2.angles.FillAnglesMethod;
+import ro.cs.products.sentinel2.angles.MetadataRepairer;
 import ro.cs.products.util.Constants;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.NetUtils;
@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -237,6 +238,16 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
     }
 
     @Override
+    protected Path link(SentinelProductDescriptor product) throws IOException {
+        String tileId = product.getTileIdentifier();
+        if (tileId != null && this.filteredTiles != null && !this.filteredTiles.contains(tileId)) {
+            getLogger().warn("(" + currentProduct + ") The product %s did not contain any tiles from the tile list", product.getName());
+            return null;
+        }
+        return linkProduct(product);
+    }
+
+    @Override
     protected String getMetadataUrl(SentinelProductDescriptor descriptor) {
         String url = null;
         switch (store) {
@@ -289,7 +300,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
             if (Files.exists(metadataFile)) {
                 List<String> allLines = Files.readAllLines(metadataFile);
                 List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + (Constants.PSD_13.equals(productDescriptor.getVersion()) ? "s" : " "));
-                boolean hasTiles = updateMedatata(metadataFile, allLines);
+                boolean hasTiles = updateMedatata(metadataFile, allLines) != null;
                 if (hasTiles) {
                     Path tilesFolder = Utilities.ensureExists(rootPath.resolve(Constants.FOLDER_GRANULE));
                     Utilities.ensureExists(rootPath.resolve(Constants.FOLDER_AUXDATA));
@@ -464,7 +475,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                 Path previewFile = metadataFile.resolveSibling("preview.png");
                 List<String> allLines = Files.readAllLines(metadataFile);
                 List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + (Constants.PSD_13.equals(product.getVersion()) ? "s" : " "));
-                boolean hasTiles = updateMedatata(metadataFile, allLines);
+                boolean hasTiles = updateMedatata(metadataFile, allLines) != null;
                 if (hasTiles) {
                     downloadFile(baseProductUrl + "inspire.xml", inspireFile);
                     downloadFile(baseProductUrl + "manifest.safe", manifestFile);
@@ -509,8 +520,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                             Path auxData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_AUXDATA));
                             Path imgData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_IMG_DATA));
                             Path qiData = Utilities.ensureExists(tileFolder.resolve(Constants.FOLDER_QI_DATA));
-                            //String refName = tileName.substring(0, tileName.lastIndexOf(NAME_SEPARATOR));
-                            String metadataName = product.getGranuleMetadataFileName(tileName); //refName.replace("MSI", "MTD");
+                            String metadataName = product.getGranuleMetadataFileName(tileName);
                             getLogger().debug("Downloading tile metadata %s", tileFolder.resolve(metadataName));
                             Path tileMetaFile = downloadFile(tileUrl + "/metadata.xml", tileFolder.resolve(metadataName));
                             List<String> tileMetadataLines = MetadataRepairer.parse(tileMetaFile, this.fillMissingAnglesMethod);
@@ -518,7 +528,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                                 if (this.bands == null || this.bands.contains(bandFileName.substring(0, bandFileName.indexOf(".")))) {
                                     try {
                                         String bandFileUrl = tileUrl + URL_SEPARATOR + bandFileName;
-                                        Path path = imgData.resolve(product.getBandFileName(tileName, bandFileName)); //imgData.resolve(refName + NAME_SEPARATOR + bandFileName);
+                                        Path path = imgData.resolve(product.getBandFileName(tileName, bandFileName));
                                         getLogger().debug("Downloading band raster %s from %s", path, bandFileName);
                                         downloadFile(bandFileUrl, path);
                                     } catch (IOException ex) {
@@ -561,7 +571,6 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                             downloadFile(tileUrl + "/auxiliary/ECMWFT", auxData.resolve(product.getEcmWftFileName(tileName))); //auxData.resolve(refName.replace(tilePrefix, auxPrefix)));
                             if (dataStripId == null) {
                                 String tileJson = tileUrl + "/tileInfo.json";
-                                //URL tileJsonUrl = new URL(tileJson);
                                 HttpURLConnection tileConnection = null;
                                 InputStream is = null;
                                 JsonReader tiReader = null;
@@ -593,7 +602,6 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                     }
                 } else {
                     Files.deleteIfExists(metadataFile);
-                    //Files.deleteIfExists(rootPath);
                     rootPath = null;
                     getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
                 }
@@ -607,6 +615,62 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
             Zipper.compress(rootPath, rootPath.getFileName().toString(), shouldDeleteAfterCompression);
         }
         return rootPath;
+    }
+
+    private Path linkProduct(SentinelProductDescriptor productDescriptor) throws IOException {
+        S2L1CProductDescriptor product = (S2L1CProductDescriptor) productDescriptor;
+        String productName = product.getName();
+        final Path productRepositoryPath = Paths.get(super.baseUrl);
+        if (!shouldFilterTiles) {
+            return link(productDescriptor, productRepositoryPath, Paths.get(destination));
+        }
+        Path destinationPath = Utilities.ensureExists(Paths.get(destination, productName + ".SAFE"));
+        Path productSourcePath = findProductPath(productRepositoryPath, product);
+        if (productSourcePath == null) {
+            getLogger().warn("%s not found locally", productName);
+            return null;
+        }
+        productLogger = new Logger.ScopeLogger(destinationPath.resolve("download.log").toString());
+        Path metadataFile = destinationPath.resolve(product.getMetadataFileName());
+        currentStep = "Metadata";
+        getLogger().debug("Copying metadata file %s", metadataFile);
+        copyFile(productSourcePath.resolve(metadataFile.getFileName()), metadataFile);
+        if (Files.exists(metadataFile)) {
+            List<String> allLines = Files.readAllLines(metadataFile);
+            Set<String> tileNames = updateMedatata(metadataFile, allLines);
+            if (tileNames != null) {
+                List<Path> folders = Utilities.listFolders(productSourcePath);
+                final Path destPath = destinationPath;
+                folders.stream()
+                        .filter(folder -> !folder.toString().contains("GRANULE") ||
+                                          "GRANULE".equals(folder.getName(folder.getNameCount() - 1).toString()) ||
+                                          tileNames.stream().anyMatch(tn -> folder.toString().contains(tn)))
+                        .forEach(folder -> {
+                                try {
+                                    Utilities.ensureExists(destPath.resolve(productSourcePath.relativize(folder)));
+                                    Utilities.listFiles(folder)
+                                            .forEach(file -> {
+                                                try {
+                                                    linkFile(file,
+                                                             destPath.resolve(productSourcePath.relativize(file)));
+                                                } catch (IOException e) {
+                                                    getLogger().warn(e.getMessage());
+                                                }
+                                            });
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                        });
+            } else {
+                Files.deleteIfExists(metadataFile);
+                getLogger().warn("The product %s did not contain any tiles from the tile list", productName);
+                destinationPath = null;
+            }
+        } else {
+            getLogger().warn("Either the product %s was not found in %s data bucket or the metadata file could not be downloaded", productName, store);
+            destinationPath = null;
+        }
+        return destinationPath;
     }
 
     @Override
@@ -641,15 +705,20 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
         return ret;
     }
 
-    private boolean updateMedatata(Path metaFile, List<String> originalLines) throws IOException {
-        boolean canProceed = true;
+    private Set<String> updateMedatata(Path metaFile, List<String> originalLines) throws IOException {
+        Set<String> extractedTileNames = null;
         if (shouldFilterTiles) {
             int tileCount = 0;
             List<String> lines = new ArrayList<>();
             for (int i = 0; i < originalLines.size(); i++) {
                 String line = originalLines.get(i);
                 if (line.contains("<Granule_List>")) {
-                    if (tileIdPattern.matcher(originalLines.get(i + 1)).matches()) {
+                    final Matcher matcher = tileIdPattern.matcher(originalLines.get(i + 1));
+                    if (matcher.matches()) {
+                        if (extractedTileNames == null) {
+                            extractedTileNames = new HashSet<>();
+                        }
+                        extractedTileNames.add(matcher.group(1));
                         lines.addAll(originalLines.subList(i, i + 17));
                         tileCount++;
                     }
@@ -658,11 +727,11 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                     lines.add(line);
                 }
             }
-            if (canProceed = (tileCount > 0)) {
+            if (tileCount > 0) {
                 Files.write(metaFile, lines, StandardCharsets.UTF_8);
             }
         }
-        return canProceed;
+        return extractedTileNames;
     }
 
     private void copyFromResources(String fileName, Path file) throws IOException {

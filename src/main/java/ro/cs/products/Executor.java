@@ -44,10 +44,10 @@ import ro.cs.products.sentinel2.Sentinel2PreOpsDownloader;
 import ro.cs.products.sentinel2.SentinelProductDownloader;
 import ro.cs.products.sentinel2.SentinelTilesMap;
 import ro.cs.products.sentinel2.amazon.AmazonSearch;
+import ro.cs.products.sentinel2.angles.FillAnglesMethod;
+import ro.cs.products.sentinel2.angles.ProductInspector;
 import ro.cs.products.sentinel2.scihub.PreOpsSciHubSearch;
 import ro.cs.products.sentinel2.scihub.SciHubSearch;
-import ro.cs.products.sentinel2.workaround.FillAnglesMethod;
-import ro.cs.products.sentinel2.workaround.ProductInspector;
 import ro.cs.products.util.Constants;
 import ro.cs.products.util.Logger;
 import ro.cs.products.util.NetUtils;
@@ -184,7 +184,8 @@ public class Executor {
             l8collection = getArgValue(commandLine, Constants.PARAM_L8_COLLECTION, LandsatCollection.class, LandsatCollection.C1);
         }
         if (commandLine.hasOption(Constants.PARAM_INPUT_FOLDER) &&
-                (downloadMode != DownloadMode.COPY && downloadMode != DownloadMode.SYMLINK)) {
+                (downloadMode != DownloadMode.COPY && downloadMode != DownloadMode.SYMLINK
+                        && downloadMode != DownloadMode.FILTERED_SYMLINK)) {
             folder = commandLine.getOptionValue(Constants.PARAM_INPUT_FOLDER);
             Utilities.ensureExists(Paths.get(folder));
             Logger.initialize(Paths.get(folder, logFile).toAbsolutePath().toString(), debugMode);

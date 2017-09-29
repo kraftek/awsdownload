@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package ro.cs.products.sentinel2.workaround;
+package ro.cs.products.sentinel2.angles;
 
 import ro.cs.products.util.Constants;
 import ro.cs.products.util.Logger;

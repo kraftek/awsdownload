@@ -46,5 +46,11 @@ public enum DownloadMode {
      * No remote download will be performed.
      * This works only in conjunction with the --input command line parameter.
      */
-    SYMLINK
+    SYMLINK,
+    /**
+     * Only symlinks to the product filtered tiles file system location, into the output folder, will be created.
+     * No remote download will be performed.
+     * This works only in conjunction with the --input command line parameter.
+     */
+    FILTERED_SYMLINK
 }

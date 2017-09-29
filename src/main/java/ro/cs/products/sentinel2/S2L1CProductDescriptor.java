@@ -63,7 +63,7 @@ public class S2L1CProductDescriptor extends SentinelProductDescriptor {
     @Override
     public String getSensingDate() {
         String[] tokens = getTokens(this.oldFormat ? ProductV13 : ProductV14, this.name, null);
-        return this.oldFormat ? tokens[5].substring(0, 8) : tokens[2].substring(0, 8);
+        return this.oldFormat ? tokens[7].substring(1, 9) : tokens[2].substring(0, 8);
     }
 
     @Override
