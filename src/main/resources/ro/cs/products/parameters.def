@@ -22,6 +22,7 @@ n/a ; z ; zip ; 0 ; ; ; true ; Compress the product into a zip archive
 n/a ; d ; delete ; 0 ; ; ; true ; Delete the product files after compression
 n/a ; v ; verbose ; 0 ; ; ; true ; Produce verbose output/logs
 n/a ; q ; query ; 0 ; ; ; true ; Only perform query and return product names
+n.a ; all ; all ; 0 ; ; ; true ; Retrieve all pages of search results
 
 # Proxy parameters
 n/a ; ptype ; proxy.type ; 1 ; http|socks ; ; true ; Proxy type. Supported values are http or socks

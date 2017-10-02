@@ -18,42 +18,16 @@
  */
 package ro.cs.products;
 
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.MissingOptionException;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.OptionGroup;
-import org.apache.commons.cli.Options;
-import ro.cs.products.base.AbstractSearch;
-import ro.cs.products.base.DownloadMode;
-import ro.cs.products.base.ProductDescriptor;
-import ro.cs.products.base.SensorType;
-import ro.cs.products.base.TileMap;
-import ro.cs.products.landsat.CollectionCategory;
-import ro.cs.products.landsat.LandsatAWSSearch;
-import ro.cs.products.landsat.LandsatCollection;
-import ro.cs.products.landsat.LandsatProductDescriptor;
-import ro.cs.products.landsat.LandsatProductDownloader;
-import ro.cs.products.landsat.LandsatTilesMap;
-import ro.cs.products.sentinel2.ProductStore;
-import ro.cs.products.sentinel2.ProductType;
-import ro.cs.products.sentinel2.S2L1CProductDescriptor;
-import ro.cs.products.sentinel2.Sentinel2PreOpsDownloader;
-import ro.cs.products.sentinel2.SentinelProductDownloader;
-import ro.cs.products.sentinel2.SentinelTilesMap;
+import org.apache.commons.cli.*;
+import ro.cs.products.base.*;
+import ro.cs.products.landsat.*;
+import ro.cs.products.sentinel2.*;
 import ro.cs.products.sentinel2.amazon.AmazonSearch;
 import ro.cs.products.sentinel2.angles.FillAnglesMethod;
 import ro.cs.products.sentinel2.angles.ProductInspector;
 import ro.cs.products.sentinel2.scihub.PreOpsSciHubSearch;
 import ro.cs.products.sentinel2.scihub.SciHubSearch;
-import ro.cs.products.util.Constants;
-import ro.cs.products.util.Logger;
-import ro.cs.products.util.NetUtils;
-import ro.cs.products.util.Polygon2D;
-import ro.cs.products.util.ReturnCode;
-import ro.cs.products.util.Utilities;
+import ro.cs.products.util.*;
 
 import java.awt.geom.Rectangle2D;
 import java.io.BufferedReader;
@@ -67,15 +41,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -430,7 +396,6 @@ public class Executor {
                     logger.info("Search will be attempted on AWS");
                     searchUrl = props.getProperty(Constants.PROPERTY_NAME_AWS_SEARCH_URL, Constants.PROPERTY_DEFAULT_AWS_SEARCH_URL);
                     searchProvider = new AmazonSearch(searchUrl);
-                    searchProvider.setTiles(tiles);
                     Calendar calendar = Calendar.getInstance();
                     SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
                     calendar.add(Calendar.DAY_OF_MONTH, Integer.parseInt(sensingStart.replace("NOW", "").replace("DAY", "")));
@@ -447,6 +412,7 @@ public class Executor {
                 if (searchProvider.getTiles() == null || searchProvider.getTiles().size() == 0) {
                     searchProvider.setAreaOfInterest(areaOfInterest);
                 }
+                searchProvider.setTiles(tiles);
                 searchProvider.setClouds(clouds);
                 if (searchPreOps) {
                     String preOpsSearchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_PREOPS_URL, Constants.PROPERTY_DEFAULT_SEARCH_PREOPS_URL);
@@ -462,6 +428,7 @@ public class Executor {
                         searchProvider.setAdditionalProvider(secondarySearch);
                     }
                 }
+                searchProvider.setRetrieveAllPages(commandLine.hasOption("all"));
                 products = searchProvider.execute();
                 if (searchMode) {
                     Path resultFile = Paths.get(folder).resolve("results.txt");

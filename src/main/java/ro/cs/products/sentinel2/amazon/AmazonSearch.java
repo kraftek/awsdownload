@@ -34,14 +34,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +46,18 @@ public class AmazonSearch extends AbstractSearch<ProductType> {
 
     public AmazonSearch(String url) throws URISyntaxException {
         super(url);
+    }
+
+    @Override
+    public AbstractSearch<ProductType> limit(int value) {
+        this.pageSize = value;
+        return this;
+    }
+
+    @Override
+    public AbstractSearch<ProductType> start(int value) {
+        this.offset = value;
+        return this;
     }
 
     @Override

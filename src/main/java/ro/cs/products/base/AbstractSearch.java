@@ -24,6 +24,7 @@ import ro.cs.products.util.Polygon2D;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -45,6 +46,9 @@ public abstract class AbstractSearch<T extends Object> {
     protected List<NameValuePair> params;
     protected UsernamePasswordCredentials credentials;
     protected String filter;
+    protected boolean allPages;
+    protected int offset;
+    protected int pageSize;
 
     public AbstractSearch(String url) throws URISyntaxException {
         this.url = new URI(url);
@@ -67,6 +71,14 @@ public abstract class AbstractSearch<T extends Object> {
         this.params = anotherSearch.params;
         this.filter = anotherSearch.filter;
     }
+
+    public void setPageSize(int value) { this.pageSize = value; }
+
+    public void setOffset(int value) { this.offset = value; }
+
+    public abstract AbstractSearch<T> limit(int value);
+
+    public abstract AbstractSearch<T> start(int value);
 
     public void setSensingStart(String sensingStart) {
         this.sensingStart = sensingStart;
@@ -96,9 +108,26 @@ public abstract class AbstractSearch<T extends Object> {
         this.additionalProvider = provider;
     }
 
+    public void setRetrieveAllPages(boolean value) { this.allPages = value; }
+
     public List<ProductDescriptor> execute() throws Exception {
-        List<ProductDescriptor> products = executeImpl();
+        List<ProductDescriptor> products = new ArrayList<>();
+        if (this.allPages) {
+            List<ProductDescriptor> subList;
+            do {
+                start(this.offset);
+                subList = executeImpl();
+                if (subList != null) {
+                    products.addAll(subList);
+                    this.offset += this.pageSize;
+                    start(this.offset);
+                    limit(this.pageSize);
+                }
+            } while (subList != null && !subList.isEmpty());
+        }
         if (hasAdditionalProvider()) {
+            this.additionalProvider.start(0);
+            this.additionalProvider.setPageSize(this.pageSize);
             products.addAll(this.additionalProvider.execute());
         }
         return products;

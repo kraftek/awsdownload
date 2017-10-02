@@ -39,13 +39,7 @@ import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -55,6 +49,18 @@ public class LandsatAWSSearch extends AbstractSearch<CollectionCategory> {
 
     public LandsatAWSSearch(String url) throws URISyntaxException {
         super(url);
+    }
+
+    @Override
+    public AbstractSearch<CollectionCategory> limit(int value) {
+        this.pageSize = value;
+        return this;
+    }
+
+    @Override
+    public AbstractSearch<CollectionCategory> start(int value) {
+        this.offset = value;
+        return this;
     }
 
     @Override
