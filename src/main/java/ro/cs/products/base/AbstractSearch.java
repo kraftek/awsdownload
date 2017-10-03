@@ -24,9 +24,13 @@ import ro.cs.products.util.Polygon2D;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Base class for search providers
@@ -113,12 +117,30 @@ public abstract class AbstractSearch<T extends Object> {
     public List<ProductDescriptor> execute() throws Exception {
         List<ProductDescriptor> products = new ArrayList<>();
         if (this.allPages) {
+            final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
+            final Calendar calendar = Calendar.getInstance();
+            calendar.set(2016, Calendar.DECEMBER, 5);
             List<ProductDescriptor> subList;
             do {
                 start(this.offset);
                 subList = executeImpl();
                 if (subList != null) {
-                    products.addAll(subList);
+                    products.addAll(subList.stream()
+                                .filter(p -> {
+                                    try {
+                                        return  dateFormat.parse(p.getSensingDate()).after(calendar.getTime()) &&
+                                                tiles.stream().anyMatch(t -> p.getName().contains(t));
+                                    } catch (ParseException e) {
+                                        return false;
+                                    }
+                                }).collect(Collectors.toList()));
+                    products.addAll(subList.stream().filter(p -> {
+                        try {
+                            return dateFormat.parse(p.getSensingDate()).before(calendar.getTime());
+                        } catch (ParseException e) {
+                            return false;
+                        }
+                    }).collect(Collectors.toList()));
                     this.offset += this.pageSize;
                     start(this.offset);
                     limit(this.pageSize);

@@ -149,12 +149,7 @@ public class SciHubSearch extends AbstractSearch<ProductType> {
                             if (currentProduct != null) {
                                 double cloudsPercentage = currentProduct.getCloudsPercentage();
                                 if (cloudFilter == 0 || cloudsPercentage <= cloudFilter) {
-                                    final ProductDescriptor cp = currentProduct;
-                                    if (tiles.stream().anyMatch(t -> cp.getName().contains(t))) {
-                                        results.add(currentProduct);
-                                    } else {
-                                        Logger.getRootLogger().debug("%s skipped [no matching tiles]", currentProduct);
-                                    }
+                                    results.add(currentProduct);
                                 } else {
                                     Logger.getRootLogger().debug("%s skipped [clouds: %s]", currentProduct, cloudsPercentage);
                                 }
