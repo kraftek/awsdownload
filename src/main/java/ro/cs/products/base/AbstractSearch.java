@@ -124,6 +124,8 @@ public abstract class AbstractSearch<T extends Object> {
                     limit(this.pageSize);
                 }
             } while (subList != null && !subList.isEmpty());
+        } else {
+            products.addAll(executeImpl());
         }
         if (hasAdditionalProvider()) {
             this.additionalProvider.start(0);
