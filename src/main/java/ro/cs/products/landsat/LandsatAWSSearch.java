@@ -39,7 +39,13 @@ import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -86,6 +92,7 @@ public class LandsatAWSSearch extends AbstractSearch<CollectionCategory> {
         Calendar endDate = Calendar.getInstance();
         endDate.setTime(dateFormat.parse(this.sensingEnd));
         final String baseUrl = this.url.toString();
+        final boolean isPreCollection = baseUrl.contains("prefix=c1");
         for (String tile : tiles) {
             String path = tile.substring(0, 3);
             String row = tile.substring(3, 6);
@@ -96,7 +103,7 @@ public class LandsatAWSSearch extends AbstractSearch<CollectionCategory> {
                         .map(p -> p.replace(productResult.getPrefix(), "").replace(productResult.getDelimiter(), ""))
                         .collect(Collectors.toSet());
                 for (String name : names) {
-                    if (this.productType != null && name.endsWith(this.productType.toString())) {
+                    if (!isPreCollection || (this.productType != null && name.endsWith(this.productType.toString()))) {
                         LandsatProductDescriptor temporaryDescriptor = new LandsatProductDescriptor(name);
                         Calendar productDate = temporaryDescriptor.getAcquisitionDate();
                         if (startDate.before(productDate) && endDate.after(productDate)) {
