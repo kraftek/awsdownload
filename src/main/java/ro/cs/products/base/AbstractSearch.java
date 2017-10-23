@@ -84,6 +84,8 @@ public abstract class AbstractSearch<T extends Object> {
 
     public abstract AbstractSearch<T> start(int value);
 
+    public AbstractSearch<T> filter(List<ProductDescriptor> productNames) { return this; }
+
     public void setSensingStart(String sensingStart) {
         this.sensingStart = sensingStart;
     }

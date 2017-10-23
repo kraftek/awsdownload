@@ -61,19 +61,21 @@ public class SciHubSearch extends AbstractSearch<ProductType> {
         return this;
     }
 
-    public SciHubSearch filter(List<String> productNames) {
-        if (productNames != null) {
+    @Override
+    public SciHubSearch filter(List<ProductDescriptor> products) {
+        if (products != null && products.size() > 0) {
             String list = "(";
-            boolean more = productNames.size() > 1;
-            for (String productName : productNames) {
-                list += productName;
+            boolean more = products.size() > 1;
+            for (ProductDescriptor product : products) {
+                list += product.getName();
                 if (more) {
                     list += " OR ";
                 }
             }
             if (more) {
-                list = list.substring(0, list.length() - 4) + ")";
+                list = list.substring(0, list.length() - 4);
             }
+            list += ")";
             this.filter += " AND " + list;
         }
         return this;

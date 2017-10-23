@@ -18,16 +18,42 @@
  */
 package ro.cs.products;
 
-import org.apache.commons.cli.*;
-import ro.cs.products.base.*;
-import ro.cs.products.landsat.*;
-import ro.cs.products.sentinel2.*;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.MissingOptionException;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.OptionGroup;
+import org.apache.commons.cli.Options;
+import ro.cs.products.base.AbstractSearch;
+import ro.cs.products.base.DownloadMode;
+import ro.cs.products.base.ProductDescriptor;
+import ro.cs.products.base.SensorType;
+import ro.cs.products.base.TileMap;
+import ro.cs.products.landsat.CollectionCategory;
+import ro.cs.products.landsat.LandsatAWSSearch;
+import ro.cs.products.landsat.LandsatCollection;
+import ro.cs.products.landsat.LandsatProductDescriptor;
+import ro.cs.products.landsat.LandsatProductDownloader;
+import ro.cs.products.landsat.LandsatTilesMap;
+import ro.cs.products.sentinel2.ProductStore;
+import ro.cs.products.sentinel2.ProductType;
+import ro.cs.products.sentinel2.S2L1CProductDescriptor;
+import ro.cs.products.sentinel2.Sentinel2PreOpsDownloader;
+import ro.cs.products.sentinel2.SentinelProductDownloader;
+import ro.cs.products.sentinel2.SentinelTilesMap;
 import ro.cs.products.sentinel2.amazon.AmazonSearch;
 import ro.cs.products.sentinel2.angles.FillAnglesMethod;
 import ro.cs.products.sentinel2.angles.ProductInspector;
 import ro.cs.products.sentinel2.scihub.PreOpsSciHubSearch;
 import ro.cs.products.sentinel2.scihub.SciHubSearch;
-import ro.cs.products.util.*;
+import ro.cs.products.util.Constants;
+import ro.cs.products.util.Logger;
+import ro.cs.products.util.NetUtils;
+import ro.cs.products.util.Polygon2D;
+import ro.cs.products.util.ReturnCode;
+import ro.cs.products.util.Utilities;
 
 import java.awt.geom.Rectangle2D;
 import java.io.BufferedReader;
@@ -41,7 +67,15 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -120,7 +154,7 @@ public class Executor {
                 .longOpt(values[2].trim())
                 .argName(values[4].trim())
                 .desc(values[7].trim())
-                .optionalArg(Boolean.parseBoolean(values[6].trim()));
+                .required(!Boolean.parseBoolean(values[6].trim()));
         String cardinality = values[3].trim();
         switch (cardinality) {
             case "1":
@@ -238,16 +272,6 @@ public class Executor {
                     SentinelTilesMap.getInstance() :
                     LandsatTilesMap.getInstance();
 
-
-            if (commandLine.hasOption(Constants.PARAM_AREA)) {
-                String[] points = commandLine.getOptionValues(Constants.PARAM_AREA);
-                for (String point : points) {
-                    areaOfInterest.append(Double.parseDouble(point.substring(0, point.indexOf(","))),
-                            Double.parseDouble(point.substring(point.indexOf(",") + 1)));
-                }
-            } else if (commandLine.hasOption(Constants.PARAM_AREA_FILE)) {
-                areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue(Constants.PARAM_AREA_FILE))), StandardCharsets.UTF_8));
-            }
             if (commandLine.hasOption(Constants.PARAM_TILE_SHAPE_FILE)) {
                 String tileShapeFile = commandLine.getOptionValue(Constants.PARAM_TILE_SHAPE_FILE);
                 if (Files.exists(Paths.get(tileShapeFile))) {
@@ -261,27 +285,20 @@ public class Executor {
                 logger.debug(String.valueOf(tileMap.getCount() + " tile extents loaded"));
             }
 
-            if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
-                Collections.addAll(tiles, commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
-            } else if (commandLine.hasOption(Constants.PARAM_TILE_LIST_FILE)) {
-                tiles.addAll(Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_TILE_LIST_FILE))));
-            }
-
-            if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST)) {
-                String[] uuids = commandLine.getOptionValues(Constants.PARAM_PRODUCT_UUID_LIST);
-                String[] productNames = commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST);
-                if (sensorType == SensorType.S2 && (!commandLine.hasOption(Constants.PARAM_DOWNLOAD_STORE) || ProductStore.SCIHUB.toString().equals(commandLine.getOptionValue(Constants.PARAM_DOWNLOAD_STORE))) &&
-                        (uuids == null || uuids.length != productNames.length)) {
-                    logger.error("For the list of product names a corresponding list of UUIDs has to be given!");
-                    return -1;
+            if (commandLine.hasOption(Constants.PARAM_AREA)) {
+                String[] points = commandLine.getOptionValues(Constants.PARAM_AREA);
+                for (String point : points) {
+                    areaOfInterest.append(Double.parseDouble(point.substring(0, point.indexOf(","))),
+                            Double.parseDouble(point.substring(point.indexOf(",") + 1)));
                 }
-                for (int i = 0; i < productNames.length; i++) {
+            } else if (commandLine.hasOption(Constants.PARAM_AREA_FILE)) {
+                areaOfInterest = Polygon2D.fromWKT(new String(Files.readAllBytes(Paths.get(commandLine.getOptionValue(Constants.PARAM_AREA_FILE))), StandardCharsets.UTF_8));
+            } else if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST)) {
+                String[] productNames = commandLine.getOptionValues(Constants.PARAM_PRODUCT_LIST);
+                for (String productName : productNames) {
                     ProductDescriptor productDescriptor = sensorType == SensorType.S2 ?
-                            new S2L1CProductDescriptor(productNames[i]) :
-                            new LandsatProductDescriptor(productNames[i]);
-                    if (uuids != null) {
-                        productDescriptor.setId(uuids[i]);
-                    }
+                            new S2L1CProductDescriptor(productName) :
+                            new LandsatProductDescriptor(productName);
                     products.add(productDescriptor);
                 }
             } else if (commandLine.hasOption(Constants.PARAM_PRODUCT_LIST_FILE)) {
@@ -290,6 +307,12 @@ public class Executor {
                             new S2L1CProductDescriptor(line) :
                             new LandsatProductDescriptor(line));
                 }
+            }
+
+            if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
+                Collections.addAll(tiles, commandLine.getOptionValues(Constants.PARAM_TILE_LIST));
+            } else if (commandLine.hasOption(Constants.PARAM_TILE_LIST_FILE)) {
+                tiles.addAll(Files.readAllLines(Paths.get(commandLine.getOptionValue(Constants.PARAM_TILE_LIST_FILE))));
             }
 
             double clouds = getArgValue(commandLine, Constants.PARAM_CLOUD_PERCENTAGE, Double.class, Constants.DEFAULT_CLOUD_PERCENTAGE);
@@ -346,101 +369,103 @@ public class Executor {
             }
             boolean searchPreOps = getArgValue(commandLine, Constants.PARAM_FLAG_PREOPS, Boolean.class, false);
             searchPreOps &= !commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS);
-            numPoints = areaOfInterest.getNumPoints();
-            if (products.size() == 0 && numPoints > 0) {
-                String searchUrl;
-                AbstractSearch searchProvider;
-                logger.debug("No product provided, searching on the AOI");
-                if (sensorType == SensorType.L8) {
-                    logger.info("Search will be attempted on AWS");
-                    searchUrl = l8collection != null && l8collection.equals(LandsatCollection.C1) ?
-                            props.getProperty(Constants.PROPERTY_NAME_LANDSAT_AWS_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL) :
-                            props.getProperty(Constants.PROPERTY_NAME_LANDSAT_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL);
-                    NetUtils netUtils = new NetUtils();
-                    if (!netUtils.isAvailable(searchUrl)) {
-                        logger.warn(searchUrl + " is not available!");
-                    }
-                    searchProvider = new LandsatAWSSearch(searchUrl);
-                    if (commandLine.hasOption(Constants.PARAM_START_DATE)) {
-                        searchProvider.setSensingStart(commandLine.getOptionValue(Constants.PARAM_START_DATE));
-                    }
-                    if (commandLine.hasOption(Constants.PARAM_END_DATE)) {
-                        searchProvider.setSensingEnd(commandLine.getOptionValue(Constants.PARAM_END_DATE));
-                    }
-                    if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
-                        searchProvider.setTiles(tiles);
-                    }
-                    if (commandLine.hasOption(Constants.PARAM_L8_PRODUCT_TYPE)) {
-                        searchProvider.setProductType(Enum.valueOf(CollectionCategory.class,
-                                                                   commandLine.getOptionValue(Constants.PARAM_L8_PRODUCT_TYPE)));
-                    }
-                } else if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS)) {
-                    logger.info("Search will be attempted on SciHub");
-                    searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
-                    if (!sciHubNetUtils.isAvailable(searchUrl)) {
-                        logger.warn(searchUrl + " is not available!");
-                        searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
-                    }
-                    searchProvider = new SciHubSearch(searchUrl, productType);
-                    SciHubSearch search = (SciHubSearch) searchProvider;
-                    if (user != null && !user.isEmpty() && pwd != null && !pwd.isEmpty()) {
-                        searchProvider = searchProvider.auth(user, pwd);
-                    }
 
+            boolean setAdditionalFilters = products.size() == 0;
+
+            String searchUrl;
+            AbstractSearch searchProvider;
+            logger.debug("No product provided, searching on the AOI");
+            if (sensorType == SensorType.L8) {
+                logger.info("Search will be attempted on AWS");
+                searchUrl = l8collection != null && l8collection.equals(LandsatCollection.C1) ?
+                        props.getProperty(Constants.PROPERTY_NAME_LANDSAT_AWS_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL) :
+                        props.getProperty(Constants.PROPERTY_NAME_LANDSAT_SEARCH_URL, Constants.PROPERTY_NAME_DEFAULT_LANDSAT_SEARCH_URL);
+                NetUtils netUtils = new NetUtils();
+                if (!netUtils.isAvailable(searchUrl)) {
+                    logger.warn(searchUrl + " is not available!");
+                }
+                searchProvider = new LandsatAWSSearch(searchUrl);
+                if (commandLine.hasOption(Constants.PARAM_START_DATE)) {
+                    searchProvider.setSensingStart(commandLine.getOptionValue(Constants.PARAM_START_DATE));
+                }
+                if (commandLine.hasOption(Constants.PARAM_END_DATE)) {
+                    searchProvider.setSensingEnd(commandLine.getOptionValue(Constants.PARAM_END_DATE));
+                }
+                if (commandLine.hasOption(Constants.PARAM_TILE_LIST)) {
+                    searchProvider.setTiles(tiles);
+                }
+                if (commandLine.hasOption(Constants.PARAM_L8_PRODUCT_TYPE)) {
+                    searchProvider.setProductType(Enum.valueOf(CollectionCategory.class,
+                                                               commandLine.getOptionValue(Constants.PARAM_L8_PRODUCT_TYPE)));
+                }
+            } else if (!commandLine.hasOption(Constants.PARAM_FLAG_SEARCH_AWS)) {
+                logger.info("Search will be attempted on SciHub");
+                searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL, Constants.PROPERTY_DEFAULT_SEARCH_URL);
+                if (!sciHubNetUtils.isAvailable(searchUrl)) {
+                    logger.warn(searchUrl + " is not available!");
+                    searchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_URL_SECONDARY, Constants.PROPERTY_DEFAULT_SEARCH_URL_SECONDARY);
+                }
+                searchProvider = new SciHubSearch(searchUrl, productType);
+                SciHubSearch search = (SciHubSearch) searchProvider;
+                if (user != null && !user.isEmpty() && pwd != null && !pwd.isEmpty()) {
+                    searchProvider = searchProvider.auth(user, pwd);
+                }
+                if (setAdditionalFilters) {
                     String interval = "[" + sensingStart + " TO " + sensingEnd + "]";
                     search.filter(Constants.SEARCH_PARAM_INTERVAL, interval).limit(limit);
                     if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
                         search.filter(Constants.SEARCH_PARAM_RELATIVE_ORBIT_NUMBER, commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT));
                     }
-                } else {
-                    logger.info("Search will be attempted on AWS");
-                    searchUrl = props.getProperty(Constants.PROPERTY_NAME_AWS_SEARCH_URL, Constants.PROPERTY_DEFAULT_AWS_SEARCH_URL);
-                    searchProvider = new AmazonSearch(searchUrl);
-                    Calendar calendar = Calendar.getInstance();
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-                    calendar.add(Calendar.DAY_OF_MONTH, Integer.parseInt(sensingStart.replace("NOW", "").replace("DAY", "")));
-                    searchProvider.setSensingStart(dateFormat.format(calendar.getTime()));
-                    calendar = Calendar.getInstance();
-                    String endOffset = sensingEnd.replace("NOW", "").replace("DAY", "");
-                    int offset = endOffset.isEmpty() ? 0 : Integer.parseInt(endOffset);
-                    calendar.add(Calendar.DAY_OF_MONTH, offset);
-                    searchProvider.setSensingEnd(dateFormat.format(calendar.getTime()));
-                    if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
-                        searchProvider.setOrbit(Integer.parseInt(commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT)));
-                    }
-                }
-                if (searchProvider.getTiles() == null || searchProvider.getTiles().size() == 0) {
-                    searchProvider.setAreaOfInterest(areaOfInterest);
-                }
-                searchProvider.setTiles(tiles);
-                searchProvider.setClouds(clouds);
-                if (searchPreOps) {
-                    String preOpsSearchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_PREOPS_URL, Constants.PROPERTY_DEFAULT_SEARCH_PREOPS_URL);
-                    NetUtils preOpsNetUtils = new NetUtils();
-                    String authToken = "Basic " + new String(Base64.getEncoder().encode(("s2bguest:s2bguest").getBytes()));
-                    preOpsNetUtils.setAuthToken(authToken);
-                    if (!preOpsNetUtils.isAvailable(preOpsSearchUrl)) {
-                        logger.warn(preOpsSearchUrl + " is not available!");
-                    } else {
-                        PreOpsSciHubSearch secondarySearch = new PreOpsSciHubSearch(preOpsSearchUrl, productType);
-                        secondarySearch.auth("s2bguest", "s2bguest");
-                        secondarySearch.copyFiltersFrom(searchProvider);
-                        searchProvider.setAdditionalProvider(secondarySearch);
-                    }
-                }
-                searchProvider.setRetrieveAllPages(commandLine.hasOption("all"));
-                products = searchProvider.execute();
-                if (searchMode) {
-                    Path resultFile = Paths.get(folder).resolve("results.txt");
-                    Files.write(resultFile,
-                                products.stream()
-                                        .map(ProductDescriptor::getName)
-                                        .collect(Collectors.toList())
-                                );
                 }
             } else {
-                logger.debug("Product name(s) present, no additional search will be performed.");
+                logger.info("Search will be attempted on AWS");
+                searchUrl = props.getProperty(Constants.PROPERTY_NAME_AWS_SEARCH_URL, Constants.PROPERTY_DEFAULT_AWS_SEARCH_URL);
+                searchProvider = new AmazonSearch(searchUrl);
+                Calendar calendar = Calendar.getInstance();
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+                calendar.add(Calendar.DAY_OF_MONTH, Integer.parseInt(sensingStart.replace("NOW", "").replace("DAY", "")));
+                searchProvider.setSensingStart(dateFormat.format(calendar.getTime()));
+                calendar = Calendar.getInstance();
+                String endOffset = sensingEnd.replace("NOW", "").replace("DAY", "");
+                int offset = endOffset.isEmpty() ? 0 : Integer.parseInt(endOffset);
+                calendar.add(Calendar.DAY_OF_MONTH, offset);
+                searchProvider.setSensingEnd(dateFormat.format(calendar.getTime()));
+                if (commandLine.hasOption(Constants.PARAM_RELATIVE_ORBIT)) {
+                    searchProvider.setOrbit(Integer.parseInt(commandLine.getOptionValue(Constants.PARAM_RELATIVE_ORBIT)));
+                }
             }
+            if (searchProvider.getTiles() == null || searchProvider.getTiles().size() == 0) {
+                searchProvider.setAreaOfInterest(areaOfInterest);
+            }
+            searchProvider.filter(products);
+            searchProvider.setTiles(tiles);
+            searchProvider.setClouds(clouds);
+
+            if (searchPreOps) {
+                String preOpsSearchUrl = props.getProperty(Constants.PROPERTY_NAME_SEARCH_PREOPS_URL, Constants.PROPERTY_DEFAULT_SEARCH_PREOPS_URL);
+                NetUtils preOpsNetUtils = new NetUtils();
+                String authToken = "Basic " + new String(Base64.getEncoder().encode(("s2bguest:s2bguest").getBytes()));
+                preOpsNetUtils.setAuthToken(authToken);
+                if (!preOpsNetUtils.isAvailable(preOpsSearchUrl)) {
+                    logger.warn(preOpsSearchUrl + " is not available!");
+                } else {
+                    PreOpsSciHubSearch secondarySearch = new PreOpsSciHubSearch(preOpsSearchUrl, productType);
+                    secondarySearch.auth("s2bguest", "s2bguest");
+                    secondarySearch.copyFiltersFrom(searchProvider);
+                    searchProvider.setAdditionalProvider(secondarySearch);
+                }
+            }
+            searchProvider.setRetrieveAllPages(commandLine.hasOption("all"));
+            products = searchProvider.execute();
+            if (searchMode) {
+                Path resultFile = Paths.get(folder).resolve("results.txt");
+                Files.write(resultFile,
+                            products.stream()
+                                    .map(ProductDescriptor::getName)
+                                    .collect(Collectors.toList())
+                            );
+            }
+
             if (!searchMode) {
                 if (downloader instanceof SentinelProductDownloader) {
                     SentinelProductDownloader sentinelProductDownloader = (SentinelProductDownloader) downloader;

@@ -73,7 +73,7 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
     protected boolean shouldDeleteAfterCompression;
     protected DownloadMode downloadMode;
     protected ProductStore store;
-
+    protected double[] averageDownloadSpeed;
     protected Logger.ScopeLogger productLogger;
 
     protected BatchProgressListener batchProgressListener;
@@ -332,6 +332,10 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
         return downloadFile(remoteUrl, file, this.downloadMode, authToken);
     }
 
+    protected void resetCounter() { this.averageDownloadSpeed = new double[] { 0.0, 0.0 }; }
+
+    protected double getAverageSpeed() { return this.averageDownloadSpeed[0]; }
+
     private Path downloadFile(String remoteUrl, Path file, DownloadMode mode, String authToken) throws IOException {
         HttpURLConnection connection = null;
         try {
@@ -388,6 +392,9 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
                         }
                     }
                     Logger.getRootLogger().debug("End reading from input stream");
+                    this.averageDownloadSpeed[0] = (this.averageDownloadSpeed[0] * this.averageDownloadSpeed[1] +
+                            (remoteFileLength / 1024 / (System.currentTimeMillis() - start) * 1000)) / (this.averageDownloadSpeed[1] + 1);
+                    this.averageDownloadSpeed[1] += 1;
                     getLogger().debug(completeMessage, currentProduct, currentStep, file.getFileName(), (System.currentTimeMillis() - start) / 1000);
                 } finally {
                     if (outputStream != null) outputStream.close();

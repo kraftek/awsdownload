@@ -65,12 +65,13 @@ public class PreOpsSciHubSearch extends AbstractSearch<ProductType> {
         return this;
     }
 
-    public PreOpsSciHubSearch filter(List<String> productNames) {
-        if (productNames != null) {
+    @Override
+    public PreOpsSciHubSearch filter(List<ProductDescriptor> products) {
+        if (products != null) {
             StringBuilder list = new StringBuilder("(");
-            boolean more = productNames.size() > 1;
-            for (String productName : productNames) {
-                list.append(productName);
+            boolean more = products.size() > 1;
+            for (ProductDescriptor product : products) {
+                list.append(product.getName());
                 if (more) {
                     list.append(" OR ");
                 }

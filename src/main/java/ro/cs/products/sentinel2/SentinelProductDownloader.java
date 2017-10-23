@@ -224,17 +224,30 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
     @Override
     protected Path download(SentinelProductDescriptor product) throws IOException {
         String tileId = product.getTileIdentifier();
-        if (tileId != null && this.filteredTiles != null && !this.filteredTiles.contains(tileId)) {
+        if (tileId != null && this.filteredTiles != null && this.filteredTiles.size() > 0 && !this.filteredTiles.contains(tileId)) {
             getLogger().warn("(" + currentProduct + ") The product %s did not contain any tiles from the tile list", product.getName());
             return null;
         }
+        resetCounter();
+        Path result = null;
         switch (store) {
             case AWS:
-                return downloadFromAWS(product);
+                result = downloadFromAWS(product);
+                break;
             case SCIHUB:
             default:
-                return downloadFromSciHub(product);
+                String uuid = product.getId();
+                if (uuid == null || uuid.isEmpty()) {
+                    getLogger().warn("Product identifier for %s missing from record", product.getName());
+                } else {
+                    result = downloadFromSciHub(product);
+                }
+                break;
         }
+        if (result != null) {
+            getLogger().info("(" + currentProduct + ") Average download speed: %.2f kB/s", getAverageSpeed());
+        }
+        return result;
     }
 
     @Override
@@ -301,7 +314,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                 List<String> allLines = Files.readAllLines(metadataFile);
                 List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + (Constants.PSD_13.equals(productDescriptor.getVersion()) ? "s" : " "));
                 boolean hasTiles = updateMedatata(metadataFile, allLines) != null;
-                if (hasTiles) {
+                if (!shouldFilterTiles || hasTiles) {
                     Path tilesFolder = Utilities.ensureExists(rootPath.resolve(Constants.FOLDER_GRANULE));
                     Utilities.ensureExists(rootPath.resolve(Constants.FOLDER_AUXDATA));
                     Path dataStripFolder = Utilities.ensureExists(rootPath.resolve(Constants.FOLDER_DATASTRIP));
