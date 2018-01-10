@@ -488,6 +488,10 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                 Path previewFile = metadataFile.resolveSibling("preview.png");
                 List<String> allLines = Files.readAllLines(metadataFile);
                 List<String> metaTileNames = Utilities.filter(allLines, "<Granule" + (Constants.PSD_13.equals(product.getVersion()) ? "s" : " "));
+                // maybe there's an old product with incorrect metadata
+                if (metaTileNames.isEmpty() && Constants.PSD_13.equals(product.getVersion())) {
+                    metaTileNames = Utilities.filter(allLines, "<Granule ");
+                }
                 boolean hasTiles = updateMedatata(metadataFile, allLines) != null;
                 if (hasTiles) {
                     downloadFile(baseProductUrl + "inspire.xml", inspireFile);
@@ -725,17 +729,32 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
             List<String> lines = new ArrayList<>();
             for (int i = 0; i < originalLines.size(); i++) {
                 String line = originalLines.get(i);
-                if (line.contains("<Granule_List>")) {
-                    final Matcher matcher = tileIdPattern.matcher(originalLines.get(i + 1));
-                    if (matcher.matches()) {
-                        if (extractedTileNames == null) {
-                            extractedTileNames = new HashSet<>();
+                boolean canProceed = line.contains("<Granule_List>") | line.contains("<Granule");
+                if (canProceed) {
+                    final String nextLine = originalLines.get(i + 1);
+                    if (nextLine.contains("<Granules")) {
+                        final Matcher matcher = tileIdPattern.matcher(nextLine);
+                        if (matcher.matches()) {
+                            if (extractedTileNames == null) {
+                                extractedTileNames = new HashSet<>();
+                            }
+                            extractedTileNames.add(matcher.group(1));
+                            lines.addAll(originalLines.subList(i, i + 17));
+                            tileCount++;
                         }
-                        extractedTileNames.add(matcher.group(1));
-                        lines.addAll(originalLines.subList(i, i + 17));
-                        tileCount++;
+                        i += 16;
+                    } else if (line.contains("<Granule")) {
+                        final Matcher matcher = tileIdPattern.matcher(line);
+                        if (matcher.matches()) {
+                            if (extractedTileNames == null) {
+                                extractedTileNames = new HashSet<>();
+                            }
+                            extractedTileNames.add(matcher.group(1));
+                            lines.addAll(originalLines.subList(i, i + 15));
+                            tileCount++;
+                        }
+                        i += 15;
                     }
-                    i += 16;
                 } else {
                     lines.add(line);
                 }
