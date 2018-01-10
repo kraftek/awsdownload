@@ -750,10 +750,12 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                                 extractedTileNames = new HashSet<>();
                             }
                             extractedTileNames.add(matcher.group(1));
-                            lines.addAll(originalLines.subList(i, i + 15));
+                            lines.addAll(originalLines.subList(i, i + 16));
                             tileCount++;
                         }
                         i += 15;
+                    } else {
+                        lines.add(line);
                     }
                 } else {
                     lines.add(line);

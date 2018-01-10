@@ -386,16 +386,18 @@ public abstract class ProductDownloader<T extends ProductDescriptor> {
                         outputStream.write(ByteBuffer.wrap(buffer, 0, read));
                         totalRead += read;
                         if (this.fileProgressListener != null) {
-                            millis = (System.currentTimeMillis() - start) / 1000;
+                            millis = Math.max(System.currentTimeMillis() - start, 1);
                             this.fileProgressListener.notifyProgress((double) totalRead / (double) remoteFileLength,
-                                    (double) (totalRead / 1024 / 1024) / (double) millis);
+                                    (double) (totalRead / 1024 / 1024) / (double) millis * 1000.);
                         }
                     }
                     Logger.getRootLogger().debug("End reading from input stream");
-                    this.averageDownloadSpeed[0] = (this.averageDownloadSpeed[0] * this.averageDownloadSpeed[1] +
-                            (remoteFileLength / 1024 / (System.currentTimeMillis() - start) * 1000)) / (this.averageDownloadSpeed[1] + 1);
+                    millis = Math.max(System.currentTimeMillis() - start, 1);
+                    double currentSpeed = (double) remoteFileLength  / 1024. / (double) millis * 1000.;
+                    this.averageDownloadSpeed[0] =
+                            (this.averageDownloadSpeed[0] * this.averageDownloadSpeed[1] + currentSpeed) / (this.averageDownloadSpeed[1] + 1);
                     this.averageDownloadSpeed[1] += 1;
-                    getLogger().debug(completeMessage, currentProduct, currentStep, file.getFileName(), (System.currentTimeMillis() - start) / 1000);
+                    getLogger().debug(completeMessage, currentProduct, currentStep, file.getFileName(), millis / 1000);
                 } finally {
                     if (outputStream != null) outputStream.close();
                     if (inputStream != null) inputStream.close();
