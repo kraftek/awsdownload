@@ -743,7 +743,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                             tileCount++;
                         }
                         i += 16;
-                    } else if (line.contains("<Granule")) {
+                    } else if (line.contains("<Granule ")) {
                         final Matcher matcher = tileIdPattern.matcher(line);
                         if (matcher.matches()) {
                             if (extractedTileNames == null) {
