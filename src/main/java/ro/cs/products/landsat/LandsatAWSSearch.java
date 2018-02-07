@@ -22,7 +22,6 @@ package ro.cs.products.landsat;
 import ro.cs.products.ProductDownloader;
 import ro.cs.products.base.AbstractSearch;
 import ro.cs.products.base.ProductDescriptor;
-import ro.cs.products.sentinel2.SentinelTilesMap;
 import ro.cs.products.sentinel2.amazon.Result;
 import ro.cs.products.sentinel2.amazon.ResultParser;
 import ro.cs.products.util.Constants;
@@ -75,7 +74,7 @@ public class LandsatAWSSearch extends AbstractSearch<CollectionCategory> {
         Set<String> tiles = this.tiles != null && this.tiles.size() > 0 ?
                 this.tiles :
                 this.aoi != null ?
-                        SentinelTilesMap.getInstance().intersectingTiles(this.aoi.getBounds2D()) :
+                        LandsatTilesMap.getInstance().intersectingTiles(this.aoi.getBounds2D()) :
                         new HashSet<>();
         final DateTimeFormatter fileDateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
