@@ -26,17 +26,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.DatePicker;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.ProgressBar;
-import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.Slider;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.text.Font;
@@ -58,11 +48,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -558,7 +544,15 @@ public class ProductSearchDialog extends Application {
     private String[] prepareArguments() throws Exception {
         List<String> args = new ArrayList<>();
         args.add("--sensor");
-        args.add(productType.getSelectionModel().getSelectedItem().toString());
+        SensorType sensorType = productType.getSelectionModel().getSelectedItem();
+        args.add(sensorType.toString());
+        if (sensorType == SensorType.L8) {
+            //--l8col C1 --l8pt T1
+            args.add("--l8col");
+            args.add("C1");
+            args.add("--l8pt");
+            args.add("T1");
+        }
         if (ProductStore.AWS.equals(searchProvider.getSelectionModel().getSelectedItem())) {
             args.add("--aws");
         } else {
