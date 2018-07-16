@@ -24,5 +24,6 @@ package ro.cs.products.sentinel2;
  */
 public enum ProductType {
     S2MSI1C,
-    S2MSI2Ap
+    S2MSI2Ap,
+    S2MSI2A
 }
