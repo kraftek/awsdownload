@@ -87,7 +87,7 @@ public class AmazonSearch extends AbstractSearch<ProductType> {
         int monthEnd = endDate.get(Calendar.MONTH) + 1;
         int dayEnd = endDate.get(Calendar.DAY_OF_MONTH);
         for (String tile : tiles) {
-            String utmCode = tile.substring(0, 2);
+            String utmCode = Integer.toString(Integer.parseInt(tile.substring(0, 2)));
             String latBand = tile.substring(2, 3);
             String square = tile.substring(3, 5);
             String tileUrl = this.url.toString() + utmCode + "/" + latBand + "/" + square + "/";

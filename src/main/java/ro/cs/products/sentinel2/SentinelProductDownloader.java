@@ -496,7 +496,8 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
                 if (hasTiles) {
                     downloadFile(baseProductUrl + "inspire.xml", inspireFile);
                     downloadFile(baseProductUrl + "manifest.safe", manifestFile);
-                    downloadFile(baseProductUrl + "preview.png", previewFile);
+                    if (Constants.PSD_13.equals(productDescriptor.getVersion()))
+                        downloadFile(baseProductUrl + "preview.png", previewFile);
 
                     // rep_info folder and contents
                     Path repFolder = Utilities.ensureExists(rootPath.resolve("rep_info"));
@@ -695,6 +696,14 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
         return productsUrl + descriptor.getProductRelativePath();
     }
 
+    private String tilePathToTileId(String tilePath) {
+        String[] tokens = tilePath.split(URL_SEPARATOR);
+        return String.format("%02d%s%s",
+                Integer.parseInt(tokens[1]),
+                tokens[2],
+                tokens[3]);
+    }
+
     private Map<String, String> getTileNames(JsonObject productInfo, List<String> metaTileNames, String psdVersion) {
         Map<String, String> ret = new HashMap<>();
         String dataTakeId = productInfo.getString("datatakeIdentifier");
@@ -703,8 +712,7 @@ public class SentinelProductDownloader extends ProductDownloader<SentinelProduct
         String skippedTiles = "";
         for (JsonObject result : tiles.getValuesAs(JsonObject.class)) {
             String tilePath = result.getString("path");
-            String[] tokens = tilePath.split(URL_SEPARATOR);
-            String tileId = tokens[1] + tokens[2] + tokens[3];
+            String tileId = tilePathToTileId(tilePath);
             if (!shouldFilterTiles || (filteredTiles.size() == 0 || filteredTiles.contains(tileId))) {
                 tileId = "T" + tileId;
                 String tileName = Utilities.find(metaTileNames, tileId, psdVersion);
